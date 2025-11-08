@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Clock,
   Sparkles,
@@ -20,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 
 export default function Home() {
+  const router = useRouter();
   const userName = "John";
   const [filterType, setFilterType] = useState("level");
   const [selectedFilter, setSelectedFilter] = useState("All");
@@ -38,6 +40,7 @@ export default function Home() {
       color: "text-coral",
       bgColor: "bg-coral/10",
       hoverBg: "hover:bg-coral/20",
+      path: "/aditi",
     },
     {
       id: "learn",
@@ -46,6 +49,7 @@ export default function Home() {
       color: "text-navy",
       bgColor: "bg-navy/10",
       hoverBg: "hover:bg-navy/20",
+      path: "/learn",
     },
     {
       id: "explore",
@@ -54,6 +58,7 @@ export default function Home() {
       color: "text-teal",
       bgColor: "bg-teal/10",
       hoverBg: "hover:bg-teal/20",
+      path: "/role",
     },
   ];
 
@@ -224,7 +229,10 @@ export default function Home() {
 
           {/* Buttons */}
           <div className="flex items-stretch gap-2.5">
-            <Button className="flex-grow bg-coral text-white hover:bg-coral-hover active:bg-coral-active h-12 rounded-[16px] font-semibold shadow-sm">
+            <Button 
+              onClick={() => router.push("/lesson")}
+              className="flex-grow bg-coral text-white hover:bg-coral-hover active:bg-coral-active h-12 rounded-[16px] font-semibold shadow-sm"
+            >
               {currentLesson.progress > 0
                 ? "Continue Learning"
                 : "Start Learning"}
@@ -255,6 +263,7 @@ export default function Home() {
             <Button
               key={cat.id}
               variant="outline"
+              onClick={() => router.push(cat.path)}
               className="h-auto flex-col p-4 bg-white border-gray-200 hover:shadow-md hover:-translate-y-1 transition-all active:scale-95 rounded-[20px]"
             >
               <div
@@ -313,7 +322,7 @@ export default function Home() {
               Categories
             </Button>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <div className="flex gap-2">
               {currentFilters.map((filter) => (
                 <Button

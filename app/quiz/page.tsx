@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import {PageHeader} from "@/components/PageHeader";
 import {
   Play,
   Volume2,
@@ -1202,6 +1203,7 @@ export default function QuizPage() {
   // Main Render
   return (
     <>
+    <PageHeader title="Quiz" />
       {quizState === "prep" && <PrepScreen />}
       {quizState === "quiz" && <QuizScreen />}
       {quizState === "results" && <ResultsScreen />}

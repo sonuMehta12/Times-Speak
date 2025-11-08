@@ -16,6 +16,7 @@ const HIDDEN_LAYOUT_ROUTES = [
   "/role",
   "/lesson",
   "/quiz",
+  "/aditi"
   // Add more routes here as needed in the future
   // "/another-route",
   // "/yet-another-route",

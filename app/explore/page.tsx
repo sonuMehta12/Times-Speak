@@ -185,8 +185,8 @@ export default function ExplorePage() {
   };
 
   return (
-    <div className="w-full -mt-4 -mx-4">
-      <main className="px-4 pb-6 pt-6 bg-bg-primary min-h-screen">
+    <div className="w-full">
+      <main className="pb-6 bg-bg-primary min-h-screen">
         {/* Featured Section */}
         <section className="mb-8 animate-fade-in-up">
           <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -236,6 +236,7 @@ export default function ExplorePage() {
         </section>
 
         {/* Create Custom Card */}
+        <div className="px-4">
         <Card
           className="mb-8 animate-fade-in-up border-2 border-dashed border-gold/30 hover:border-gold hover:shadow-md transition-all duration-300 cursor-pointer rounded-[24px] overflow-hidden bg-gradient-to-br from-gold/5 to-navy/5"
           style={{ animationDelay: "100ms" }}
@@ -255,13 +256,14 @@ export default function ExplorePage() {
             </Button>
           </CardContent>
         </Card>
+        </div>
 
         {/* Categories Section */}
         <section
-          className="mb-8 animate-fade-in-up"
+          className="mb-6 animate-fade-in-up"
           style={{ animationDelay: "150ms" }}
         >
-          <h2 className="font-display text-lg font-bold text-navy mb-4">
+          <h2 className="font-display text-lg font-bold text-navy mb-4 px-4">
             Categories
           </h2>
           <div className="flex gap-3 overflow-x-auto pb-4 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -308,10 +310,10 @@ export default function ExplorePage() {
           className="animate-fade-in-up"
           style={{ animationDelay: "300ms" }}
         >
-          <h2 className="font-display text-lg font-bold text-navy mb-4">
+          <h2 className="font-display text-lg font-bold text-navy mb-4 px-4">
             All Scenarios
           </h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4 px-4">
             {allScenarios.map((scenario) => (
               <Card
                 key={scenario.id}

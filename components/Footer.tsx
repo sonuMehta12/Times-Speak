@@ -11,9 +11,9 @@ export default function Footer() {
 
   const navItems = [
     { href: "/", label: "Home", icon: Home },
-    { href: "/learn", label: "Learn", icon: BookOpen },
-    { href: "/aditi", label: "Aditi", icon: null, isAI: true }, // Special AI tutor item
     { href: "/explore", label: "Explore", icon: Compass },
+    { href: "/aditi", label: "Aditi", icon: null, isAI: true }, // Special AI tutor item
+    { href: "/learn", label: "Learn", icon: BookOpen },
     { href: "/profile", label: "Profile", icon: User },
   ];
 

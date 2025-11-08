@@ -54,7 +54,7 @@ export default function Navbar() {
                 {selectedLanguage}
               </span>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="end" className="w-44 bg-white border border-gray-200 rounded-[12px] shadow-lg">
               {languages.map((lang) => (
                 <DropdownMenuItem
                   key={lang.code}
