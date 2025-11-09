@@ -315,16 +315,21 @@ const CallView: React.FC<{ userName: string; callDuration: number }> = ({ userNa
           onMessage: (message: LiveServerMessage) => {
             // Type guard to ensure serverContent is an object
             if (message.serverContent && typeof message.serverContent === 'object') {
-              // Handle user transcript
+              // Handle user transcript (real-time updates)
               const userText = message.serverContent.turnComplete?.parts?.[0]?.text;
               if (userText) {
                 setUserTranscript(userText);
               }
 
-              // Handle AI transcript
+              // Handle AI transcript (real-time updates during model turn)
               const aiText = message.serverContent.modelTurn?.parts?.[0]?.text;
               if (aiText) {
                 setAiTranscript(aiText);
+              }
+
+              // Handle interrupted state - clear AI transcript when interrupted
+              if (message.serverContent.interrupted) {
+                // User interrupted, keep the last user transcript visible
               }
             }
           },
@@ -440,27 +445,30 @@ const CallView: React.FC<{ userName: string; callDuration: number }> = ({ userNa
           </Card>
         )}
 
-        {/* Live Transcripts */}
+        {/* Live Transcripts - Closed Captions */}
         {isConnected && showTranscript && (
-          <div className="w-full max-w-md space-y-3 animate-fade-in-up">
-            {aiTranscript && (
-              <Card className="bg-white/10 backdrop-blur-sm border-white/20 rounded-[16px]">
-                <CardContent className="p-3">
-                  <p className="text-xs text-teal font-semibold mb-1">Aditi:</p>
-                  <p className="text-sm text-white/90 font-body">{aiTranscript}</p>
-                </CardContent>
-              </Card>
-            )}
-            
-            {userTranscript && (
-              <Card className="bg-white/10 backdrop-blur-sm border-white/20 rounded-[16px]">
-                <CardContent className="p-3">
-                  <p className="text-xs text-coral font-semibold mb-1">You:</p>
-                  <p className="text-sm text-white/90 font-body">{userTranscript}</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+          <Card className="w-full max-w-md bg-black/40 backdrop-blur-md border-white/20 rounded-[16px] animate-fade-in-up">
+            <CardContent className="p-4 space-y-3">
+              {/* AI Transcript */}
+              <div className="space-y-1">
+                <p className="text-xs text-teal font-semibold">Aditi:</p>
+                <p className="text-sm text-white/90 font-body leading-relaxed">
+                  {aiTranscript || <span className="text-white/50 italic">Listening...</span>}
+                </p>
+              </div>
+              
+              {/* Divider */}
+              <div className="border-t border-white/10"></div>
+              
+              {/* User Transcript */}
+              <div className="space-y-1">
+                <p className="text-xs text-coral font-semibold">You:</p>
+                <p className="text-sm text-white/90 font-body leading-relaxed">
+                  {userTranscript || <span className="text-white/50 italic">Speak to see your transcript...</span>}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
       
