@@ -16,6 +16,8 @@ import {
   Repeat,
   Play,
   Pause,
+  Square,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +34,44 @@ interface Message {
   feedback?: {
     grade: string;
   };
+}
+
+// Web Speech API type definitions
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+interface SpeechRecognitionEvent extends Event {
+  results: {
+    [key: number]: {
+      [key: number]: {
+        transcript: string;
+      };
+    };
+  };
+}
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  onstart: () => void;
+  onresult: (e: SpeechRecognitionEvent) => void;
+  onerror: (e: SpeechRecognitionErrorEvent) => void;
+  onend: () => void;
+}
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
+
+interface PronunciationFeedback {
+  score: number;
+  grade: string;
+  spokenText: string;
+  expectedText: string;
 }
 
 export default function RolePlayConversationPage() {
@@ -53,7 +93,34 @@ export default function RolePlayConversationPage() {
   const [showHintModal, setShowHintModal] = useState(false);
   const [isPlayingRecording, setIsPlayingRecording] = useState(false);
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
+  const [translatedMessages, setTranslatedMessages] = useState<Record<number, string>>({});
+  const [showTranslation, setShowTranslation] = useState<Record<number, boolean>>({});
+  const [isGuidedMode, setIsGuidedMode] = useState(true);
+  const [recordingState, setRecordingState] = useState<'idle' | 'recording' | 'processing' | 'feedback'>('idle');
+  const [pronunciationFeedback, setPronunciationFeedback] = useState<PronunciationFeedback | null>(null);
+  const [spokenText, setSpokenText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasPlayedConversation = useRef(false);
+  const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // Hinglish translations for messages
+  const hinglishTranslations: Record<number, string> = {
+    1: "Hey! Mujhe nahi lagta humari mulaqat hui hai. Main Aisha hoon Marketing se.",
+    2: "Oh, hi Aisha! Nice to meet you. Main Rohan hoon. Uh, main Times Internet mein kaam karta hoon, jahan main client accounts handle karta hoon.",
+    3: "Oh cool! Client accounts — yeh toh interesting lagta hai. Kaun se accounts?",
+    4: "Mostly B2B clients, you know, corporate partnerships aur sab. Main currently focus kar raha hoon ki hum nayi clients ko kaise better onboard karein.",
+    5: "Hmm, onboarding. Haan, yeh tricky ho sakta hai. Tumhari main responsibility kya hai wahan?",
+    6: "Well, main poori onboarding process ke liye responsible hoon, jo humein clients ko faster set up karne mein help karta hai. Hum time kam karne ki koshish kar rahe hain.",
+    7: "That makes sense. Kaisa chal raha hai?",
+    8: "Actually, pretty well! Recently, maine apni documentation process ko streamline kiya, jisse lagbhag 30% faster turnaround hua.",
+    9: "Wow, that's impressive! 30% toh significant hai.",
+    10: "Thanks! Tumhare baare mein kya? Marketing yahan kya karti hai?",
+    11: "Oh, meri role mein different teams ke beech coordination hota hai — creative, sales, analytics — jo mujhe apne campaigns ka big picture dekhne deta hai.",
+    12: "Lagta hai tumhare haath bhare hue hain!",
+    13: "[laughs] Haan, definitely! Par interesting kaam hai. Anyway, nice meeting you, Rohan.",
+    14: "You too, Aisha. See you around!",
+  };
 
   const conversationScript: Message[] = [
     {
@@ -157,6 +224,146 @@ export default function RolePlayConversationPage() {
     scrollToBottom();
   }, [displayedMessages]);
 
+  // Text-to-speech function for individual messages
+  const speakMessage = (text: string, sender: MessageSender) => {
+    if (!('speechSynthesis' in window)) {
+      alert("Your browser does not support text-to-speech.");
+      return;
+    }
+
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.9;
+    
+    // Use different voices for AI (female) and user (male)
+    const voices = window.speechSynthesis.getVoices();
+    if (sender === 'ai') {
+      // Try to find a female voice
+      const femaleVoice = voices.find(voice => 
+        voice.name.includes('Female') || 
+        voice.name.includes('female') ||
+        voice.name.includes('Samantha') ||
+        voice.name.includes('Victoria') ||
+        voice.name.includes('Zira')
+      );
+      if (femaleVoice) utterance.voice = femaleVoice;
+      utterance.pitch = 1.1;
+    } else {
+      // Try to find a male voice
+      const maleVoice = voices.find(voice => 
+        voice.name.includes('Male') || 
+        voice.name.includes('male') ||
+        voice.name.includes('David') ||
+        voice.name.includes('Mark')
+      );
+      if (maleVoice) utterance.voice = maleVoice;
+      utterance.pitch = 0.9;
+    }
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Toggle translation visibility
+  const toggleTranslation = (messageId: number) => {
+    setShowTranslation(prev => ({
+      ...prev,
+      [messageId]: !prev[messageId]
+    }));
+  };
+
+  // Analyze pronunciation and compare with expected text
+  const analyzePronunciation = (spoken: string, expected: string) => {
+    const spokenWords = spoken.toLowerCase().replace(/[.,!?]/g, '').split(/\s+/).filter(Boolean);
+    const expectedWords = expected.toLowerCase().replace(/[.,!?]/g, '').split(/\s+/).filter(Boolean);
+
+    // Calculate word-level accuracy
+    let correctWords = 0;
+    const minLength = Math.min(spokenWords.length, expectedWords.length);
+    
+    for (let i = 0; i < minLength; i++) {
+      if (spokenWords[i] === expectedWords[i]) {
+        correctWords++;
+      }
+    }
+
+    // Calculate score
+    const score = expectedWords.length > 0 
+      ? Math.round((correctWords / expectedWords.length) * 100) 
+      : 0;
+
+    // Determine grade
+    let grade = '';
+    if (score >= 90) grade = "Excellent!";
+    else if (score >= 70) grade = "Good Start!";
+    else if (score >= 50) grade = "Keep Practicing";
+    else grade = "Try Again";
+
+    return {
+      score,
+      grade,
+      spokenText: spoken,
+      expectedText: expected
+    };
+  };
+
+  // Setup speech recognition
+  useEffect(() => {
+    if (!isPracticeMode) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognitionInstance = new SpeechRecognition();
+      recognitionInstance.continuous = false;
+      recognitionInstance.interimResults = false;
+      recognitionInstance.lang = 'en-US';
+
+      recognitionInstance.onstart = () => {
+        setRecordingState('recording');
+      };
+
+      recognitionInstance.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setSpokenText(transcript);
+        setRecordingState('processing');
+
+        // Get expected response
+        const userMessageIndex = currentPracticeIndex + 1;
+        if (userMessageIndex < conversationScript.length) {
+          const expectedMessage = conversationScript[userMessageIndex];
+          if (expectedMessage.sender === 'user') {
+            const feedback = analyzePronunciation(transcript, expectedMessage.text);
+            setPronunciationFeedback(feedback);
+            setRecordingState('feedback');
+          }
+        }
+      };
+
+      recognitionInstance.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setRecordingState('idle');
+        alert('Speech recognition error. Please try again.');
+      };
+
+      recognitionInstance.onend = () => {
+        setIsRecording(false);
+        if (recordingState === 'recording') {
+          setRecordingState('processing');
+        }
+      };
+
+      recognitionRef.current = recognitionInstance;
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [isPracticeMode, currentPracticeIndex]);
+
   const playConversation = async () => {
     if (isPlaying) return;
 
@@ -166,6 +373,11 @@ export default function RolePlayConversationPage() {
     setIsPracticeMode(false);
     setCurrentPracticeIndex(0);
     setUserRecordings([]);
+
+    // Load voices first
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.getVoices();
+    }
 
     for (let i = 0; i < conversationScript.length; i++) {
       const message = conversationScript[i];
@@ -179,6 +391,9 @@ export default function RolePlayConversationPage() {
       setDisplayedMessages((prev) => [...prev, messageWithUserName]);
       setActiveMessageId(message.id);
 
+      // Auto-play the message with appropriate voice
+      speakMessage(messageWithUserName.text, message.sender);
+
       const readTime = message.text.length * 40 + 500;
       await new Promise((resolve) => setTimeout(resolve, readTime));
     }
@@ -188,7 +403,10 @@ export default function RolePlayConversationPage() {
   };
 
   useEffect(() => {
-    playConversation();
+    if (!hasPlayedConversation.current) {
+      hasPlayedConversation.current = true;
+      playConversation();
+    }
   }, []);
 
   const handleEnterPracticeMode = async () => {
@@ -207,50 +425,84 @@ export default function RolePlayConversationPage() {
     setDisplayedMessages([messageWithNames]);
   };
 
-  const handleRecordResponse = () => {
-    if (isRecording) return;
+  const handleRecordResponse = async () => {
+    if (recordingState !== 'idle') return;
 
-    setIsRecording(true);
+    try {
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
 
-    // Simulate recording for 3 seconds
-    setTimeout(() => {
-      setIsRecording(false);
+      // Start speech recognition
+      setIsRecording(true);
+      setPronunciationFeedback(null);
+      setSpokenText('');
+      recognitionRef.current?.start();
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      alert("Microphone access denied. Please enable it in your browser settings.");
+    }
+  };
 
-      // Add user's response
-      const userMessageIndex = currentPracticeIndex + 1;
-      if (userMessageIndex < conversationScript.length) {
-        const userMessage = conversationScript[userMessageIndex];
-        if (userMessage.sender === "user") {
-          const messageWithNames = {
-            ...userMessage,
-            text: userMessage.text
-              .replace(/Rohan/g, userName)
-              .replace(/Aisha/g, aiName),
-          };
-          setDisplayedMessages((prev) => [...prev, messageWithNames]);
-          setUserRecordings((prev) => [...prev, userMessage.id]);
-
-          // Wait a bit, then show next AI message
-          setTimeout(() => {
-            const nextAiIndex = userMessageIndex + 1;
-            if (nextAiIndex < conversationScript.length) {
-              const nextAiMessage = conversationScript[nextAiIndex];
-              const messageWithNames = {
-                ...nextAiMessage,
-                text: nextAiMessage.text.replace(/Aisha/g, aiName),
-              };
-              setDisplayedMessages((prev) => [...prev, messageWithNames]);
-              setCurrentPracticeIndex(nextAiIndex);
-            } else {
-              // Conversation ended
-              setTimeout(() => {
-                setShowFeedbackModal(true);
-              }, 1000);
-            }
-          }, 1500);
-        }
+  const handleStopRecording = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+        setRecordingState('idle');
+        setIsRecording(false);
+      } catch (err) {
+        console.error("Error stopping recording:", err);
       }
-    }, 3000);
+    }
+  };
+
+  const handleContinueAfterFeedback = () => {
+    if (!pronunciationFeedback) return;
+
+    // Add user's response with feedback
+    const userMessageIndex = currentPracticeIndex + 1;
+    if (userMessageIndex < conversationScript.length) {
+      const userMessage = conversationScript[userMessageIndex];
+      if (userMessage.sender === "user") {
+        const messageWithNames = {
+          ...userMessage,
+          text: userMessage.text
+            .replace(/Rohan/g, userName)
+            .replace(/Aisha/g, aiName),
+        };
+        setDisplayedMessages((prev) => [...prev, messageWithNames]);
+        setUserRecordings((prev) => [...prev, userMessage.id]);
+
+        // Reset feedback state
+        setPronunciationFeedback(null);
+        setRecordingState('idle');
+
+        // Wait a bit, then show next AI message
+        setTimeout(() => {
+          const nextAiIndex = userMessageIndex + 1;
+          if (nextAiIndex < conversationScript.length) {
+            const nextAiMessage = conversationScript[nextAiIndex];
+            const messageWithNames = {
+              ...nextAiMessage,
+              text: nextAiMessage.text.replace(/Aisha/g, aiName),
+            };
+            setDisplayedMessages((prev) => [...prev, messageWithNames]);
+            setCurrentPracticeIndex(nextAiIndex);
+          } else {
+            // Conversation ended
+            setTimeout(() => {
+              setShowFeedbackModal(true);
+            }, 1000);
+          }
+        }, 1500);
+      }
+    }
+  };
+
+  const handleRetryRecording = () => {
+    setPronunciationFeedback(null);
+    setRecordingState('idle');
+    setSpokenText('');
   };
 
   const handleSwapRoles = () => {
@@ -419,6 +671,7 @@ export default function RolePlayConversationPage() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => speakMessage(msg.text, msg.sender)}
                         className={`h-7 w-7 rounded-full transition-colors ${
                           msg.sender === "user"
                             ? "bg-white/20 hover:bg-white/30 text-white"
@@ -431,11 +684,12 @@ export default function RolePlayConversationPage() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => toggleTranslation(msg.id)}
                         className={`h-7 w-7 rounded-full transition-colors ${
                           msg.sender === "user"
                             ? "bg-white/20 hover:bg-white/30 text-white"
                             : "bg-gray-100 hover:bg-gray-200 text-text-secondary"
-                        }`}
+                        } ${showTranslation[msg.id] ? 'ring-2 ring-gold' : ''}`}
                         aria-label="Translate"
                       >
                         <Languages className="h-3.5 w-3.5" />
@@ -444,6 +698,29 @@ export default function RolePlayConversationPage() {
                         {msg.time}
                       </span>
                     </div>
+
+                    {/* Translation Card */}
+                    {showTranslation[msg.id] && hinglishTranslations[msg.id] && (
+                      <Card className="mt-3 p-3 bg-gold/10 border-gold/30 rounded-[12px] animate-fade-in-up">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-1.5">
+                            <Languages className="h-3.5 w-3.5 text-gold" />
+                            <span className="text-xs font-semibold text-gold">Hinglish Translation</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleTranslation(msg.id)}
+                            className="h-5 w-5 rounded-full hover:bg-gold/20 text-gold -mt-1 -mr-1"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <p className="text-sm text-text-primary leading-relaxed">
+                          {hinglishTranslations[msg.id].replace(/Rohan/g, userName).replace(/Aisha/g, aiName)}
+                        </p>
+                      </Card>
+                    )}
 
                     {msg.sender === "user" &&
                       msg.feedback &&
@@ -457,6 +734,72 @@ export default function RolePlayConversationPage() {
                 </div>
               </div>
             ))}
+
+            {/* Expected Response Prompt - Always show in Guided Mode */}
+            {isPracticeMode && isGuidedMode && recordingState !== 'feedback' && currentPracticeIndex < conversationScript.length - 1 && (
+              <Card className="mt-4 p-4 bg-teal/10 border-teal/30 rounded-[16px] animate-fade-in-up">
+                <div className="flex items-start gap-2">
+                  <Lightbulb className="h-4 w-4 text-teal mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-teal mb-1">Say this:</p>
+                    <p className="text-sm text-text-primary leading-relaxed">
+                      {conversationScript[currentPracticeIndex + 1]?.sender === 'user' 
+                        ? conversationScript[currentPracticeIndex + 1].text.replace(/Rohan/g, userName).replace(/Aisha/g, aiName)
+                        : ''}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* Pronunciation Feedback Card */}
+            {isPracticeMode && recordingState === 'feedback' && pronunciationFeedback && (
+              <Card className="mt-4 p-4 bg-white border-2 border-teal rounded-[16px] shadow-md animate-fade-in-up">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-10 h-10 rounded-[12px] flex items-center justify-center ${
+                      pronunciationFeedback.score >= 70 ? 'bg-success' : 'bg-coral'
+                    }`}>
+                      <span className="text-white font-bold text-lg">{pronunciationFeedback.score}</span>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-text-primary text-sm">{pronunciationFeedback.grade}</p>
+                      <p className="text-xs text-text-secondary">Pronunciation Score</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 mb-4">
+                  <div className="p-3 bg-gray-50 rounded-[12px]">
+                    <p className="text-xs font-semibold text-text-secondary mb-1">You said:</p>
+                    <p className="text-sm text-text-primary">{pronunciationFeedback.spokenText}</p>
+                  </div>
+                  <div className="p-3 bg-teal/10 rounded-[12px]">
+                    <p className="text-xs font-semibold text-teal mb-1">Expected:</p>
+                    <p className="text-sm text-text-primary">{pronunciationFeedback.expectedText}</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleRetryRecording}
+                    variant="outline"
+                    className="flex-1 border-2 border-coral text-coral hover:bg-coral/10 py-2 rounded-[12px] font-semibold transition-all"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Try Again
+                  </Button>
+                  <Button
+                    onClick={handleContinueAfterFeedback}
+                    className="flex-1 bg-teal hover:bg-teal-hover text-white py-2 rounded-[12px] font-semibold transition-all"
+                  >
+                    Continue
+                    <ChevronRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </div>
+              </Card>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
         </main>
@@ -503,48 +846,91 @@ export default function RolePlayConversationPage() {
               </Button>
             </div>
           ) : (
-            <div className="flex items-center justify-between max-w-sm mx-auto">
-              {/* Hint Button */}
-              <Button
-                variant="ghost"
-                onClick={handleShowHint}
-                disabled={hintsRemaining === 0}
-                className="flex flex-col items-center gap-1.5 text-text-secondary hover:text-gold transition-colors w-20 h-auto hover:bg-transparent p-0 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <div
-                  className={`h-12 w-12 rounded-[14px] flex items-center justify-center shadow-sm transition-all active:scale-95 ${
-                    hintsRemaining > 0
-                      ? "bg-gold/10 text-gold hover:bg-gold/20 hover:shadow-md"
-                      : "bg-gray-100 text-gray-400"
+            <div className="space-y-3">
+              {/* Mode Toggle */}
+              <div className="flex items-center justify-center gap-2 pb-2">
+                <button
+                  onClick={() => setIsGuidedMode(true)}
+                  className={`px-4 py-2 rounded-[12px] text-sm font-semibold transition-all ${
+                    isGuidedMode
+                      ? 'bg-teal text-white shadow-sm'
+                      : 'bg-gray-100 text-text-secondary hover:bg-gray-200'
                   }`}
                 >
-                  <Lightbulb className="h-5 w-5" />
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-semibold">Hint</span>
-                  <Badge className="bg-gold/20 text-gold border-0 px-1.5 py-0 text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center">
-                    {hintsRemaining}
-                  </Badge>
-                </div>
-              </Button>
+                  Guided
+                </button>
+                <button
+                  onClick={() => setIsGuidedMode(false)}
+                  className={`px-4 py-2 rounded-[12px] text-sm font-semibold transition-all ${
+                    !isGuidedMode
+                      ? 'bg-teal text-white shadow-sm'
+                      : 'bg-gray-100 text-text-secondary hover:bg-gray-200'
+                  }`}
+                >
+                  Unguided
+                </button>
+              </div>
 
-              {/* Tap to Speak Button */}
-              <Button
-                onClick={handleRecordResponse}
-                disabled={
-                  isRecording ||
-                  currentPracticeIndex >= conversationScript.length - 1
-                }
-                className={`flex items-center gap-3 px-8 py-6 bg-coral hover:bg-coral-hover text-white rounded-[16px] font-semibold text-lg shadow-lg hover:shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isRecording ? "animate-pulse" : ""
-                }`}
-              >
-                <Mic className="h-6 w-6" />
-                <span>{isRecording ? "Recording..." : "Tap to Speak"}</span>
-              </Button>
+              <div className="flex items-center justify-between max-w-sm mx-auto">
+                {/* Hint Button - Only show in unguided mode */}
+                {!isGuidedMode && (
+                  <Button
+                    variant="ghost"
+                    onClick={handleShowHint}
+                    disabled={hintsRemaining === 0}
+                    className="flex flex-col items-center gap-1.5 text-text-secondary hover:text-gold transition-colors w-20 h-auto hover:bg-transparent p-0 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <div
+                      className={`h-12 w-12 rounded-[14px] flex items-center justify-center shadow-sm transition-all active:scale-95 ${
+                        hintsRemaining > 0
+                          ? "bg-gold/10 text-gold hover:bg-gold/20 hover:shadow-md"
+                          : "bg-gray-100 text-gray-400"
+                      }`}
+                    >
+                      <Lightbulb className="h-5 w-5" />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-semibold">Hint</span>
+                      <Badge className="bg-gold/20 text-gold border-0 px-1.5 py-0 text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center">
+                        {hintsRemaining}
+                      </Badge>
+                    </div>
+                  </Button>
+                )}
 
-              {/* Empty space for balance */}
-              <div className="w-20" />
+                {/* Tap to Speak Button */}
+                <Button
+                  onClick={recordingState === 'recording' ? handleStopRecording : handleRecordResponse}
+                  disabled={
+                    recordingState === 'processing' ||
+                    recordingState === 'feedback' ||
+                    currentPracticeIndex >= conversationScript.length - 1
+                  }
+                  className={`flex items-center gap-3 px-8 py-6 bg-coral hover:bg-coral-hover text-white rounded-[16px] font-semibold text-lg shadow-lg hover:shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    recordingState === 'recording' ? "animate-pulse" : ""
+                  } ${!isGuidedMode ? 'mx-auto' : ''}`}
+                >
+                  {recordingState === 'recording' ? (
+                    <>
+                      <Square className="h-6 w-6" />
+                      <span>Stop</span>
+                    </>
+                  ) : recordingState === 'processing' ? (
+                    <>
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="h-6 w-6" />
+                      <span>Tap to Speak</span>
+                    </>
+                  )}
+                </Button>
+
+                {/* Empty space for balance in guided mode */}
+                {isGuidedMode && <div className="w-20" />}
+              </div>
             </div>
           )}
         </footer>

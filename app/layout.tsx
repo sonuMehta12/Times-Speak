@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import ConditionalLayout from "@/components/ConditionalLayout";
+import OnboardingWrapper from "@/components/OnboardingWrapper";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -34,9 +35,11 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} ${playfair.variable} antialiased`}>
-        <div className="mobile-app">
-          <ConditionalLayout>{children}</ConditionalLayout>
-        </div>
+        <OnboardingWrapper>
+          <div className="mobile-app">
+            <ConditionalLayout>{children}</ConditionalLayout>
+          </div>
+        </OnboardingWrapper>
       </body>
     </html>
   );

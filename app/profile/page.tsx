@@ -1,6 +1,7 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronRight, LogOut, Bell, Shield, HelpCircle, Flame, Clock, BookOpen, User as UserIcon, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -55,11 +56,24 @@ const StatCard: React.FC<{
 );
 
 export default function ProfilePage() {
-  const userName = "John"; // Replace with actual user from auth/context
+  const router = useRouter();
+  const [userName, setUserName] = useState("John");
+
+  // Load user data from localStorage
+  useEffect(() => {
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      try {
+        const parsedData = JSON.parse(userData);
+        setUserName(parsedData.userName || 'John');
+      } catch (err) {
+        console.error('Error parsing user data:', err);
+      }
+    }
+  }, []);
 
   const handleBack = () => {
     window.history.back();
-    // Or use: router.push('/') if using next/navigation
   };
 
   const handleEditProfile = () => {
@@ -84,8 +98,12 @@ export default function ProfilePage() {
   };
 
   const handleLogout = () => {
-    // Add logout logic
-    console.log('Logout');
+    // Clear onboarding data to restart flow
+    localStorage.removeItem('onboardingCompleted');
+    localStorage.removeItem('userData');
+    
+    // Reload the page to trigger onboarding
+    window.location.reload();
   };
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Flame, Globe } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -13,10 +13,23 @@ import {
 export default function Navbar() {
   const [streak, setStreak] = useState(7);
   const [selectedLanguage, setSelectedLanguage] = useState("EN");
+  const [userName, setUserName] = useState("John");
 
-  // Mock user data - replace with actual user data
+  // Load user data from localStorage
+  useEffect(() => {
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      try {
+        const parsedData = JSON.parse(userData);
+        setUserName(parsedData.userName || 'John');
+      } catch (err) {
+        console.error('Error parsing user data:', err);
+      }
+    }
+  }, []);
+
   const user = {
-    name: "John",
+    name: userName,
     image: null, // Set to user photo URL if available
   };
 

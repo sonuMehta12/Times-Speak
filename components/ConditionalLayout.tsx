@@ -5,21 +5,25 @@ import Navbar from "./Navbar";
 import Footer from "./Footer";
 
 /**
- * Define routes where Navbar and Footer should be hidden.
+ * Define routes where both Navbar and Footer should be hidden.
  *
- * To hide layout on a new route, simply add the route path to this array.
- * The component uses `startsWith()` so all sub-routes will also hide the layout.
- *
- * Example: Adding "/role" will hide layout for "/role", "/role/123", "/role/practice", etc.
+ * Example: Adding "/role" will hide both for "/role", "/role/123", "/role/practice", etc.
  */
-const HIDDEN_LAYOUT_ROUTES = [
+const HIDE_BOTH_ROUTES = [
   "/role",
-  "/lesson",
   "/quiz",
   "/aditi"
-  // Add more routes here as needed in the future
-  // "/another-route",
-  // "/yet-another-route",
+  // Add more routes here as needed
+];
+
+/**
+ * Define routes where only Navbar should be hidden (Footer will still show).
+ *
+ * Example: Adding "/lesson" will hide navbar but show footer for "/lesson" and sub-routes.
+ */
+const HIDE_NAVBAR_ONLY_ROUTES = [
+  "/lesson"
+  // Add more routes here as needed
 ];
 
 export default function ConditionalLayout({
@@ -29,16 +33,25 @@ export default function ConditionalLayout({
 }) {
   const pathname = usePathname();
 
-  // Check if current route should hide layout
-  const shouldHideLayout = HIDDEN_LAYOUT_ROUTES.some((route) =>
+  // Check if current route should hide both navbar and footer
+  const shouldHideBoth = HIDE_BOTH_ROUTES.some((route) =>
     pathname.startsWith(route)
   );
 
+  // Check if current route should hide only navbar
+  const shouldHideNavbarOnly = HIDE_NAVBAR_ONLY_ROUTES.some((route) =>
+    pathname.startsWith(route)
+  );
+
+  // Determine what to show
+  const showNavbar = !shouldHideBoth && !shouldHideNavbarOnly;
+  const showFooter = !shouldHideBoth;
+
   return (
     <>
-      {!shouldHideLayout && <Navbar />}
+      {showNavbar && <Navbar />}
       <main className="mobile-content">{children}</main>
-      {!shouldHideLayout && <Footer />}
+      {showFooter && <Footer />}
     </>
   );
 }

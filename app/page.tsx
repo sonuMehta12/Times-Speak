@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Clock,
@@ -22,10 +22,23 @@ import Image from "next/image";
 
 export default function Home() {
   const router = useRouter();
-  const userName = "John";
+  const [userName, setUserName] = useState("John");
   const [filterType, setFilterType] = useState("level");
   const [selectedFilter, setSelectedFilter] = useState("All");
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
+
+  // Load user data from localStorage
+  useEffect(() => {
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      try {
+        const parsedData = JSON.parse(userData);
+        setUserName(parsedData.userName || 'John');
+      } catch (err) {
+        console.error('Error parsing user data:', err);
+      }
+    }
+  }, []);
 
   const levelFilters = ["All", "Beginner", "Intermediate", "Advanced"];
   const categoryFilters = ["All", "Business", "Travel", "Casual", "Academic"];
@@ -65,12 +78,12 @@ export default function Home() {
   const todaysLessons = [
     {
       id: 1,
-      title: "Asking for Directions",
-      category: "Travel",
-      level: "A2",
-      emoji: "🗺️",
-      quote: "Could you tell me how to get to",
-      fillIn: "______",
+      title: "Meeting a new Colleague",
+      category: "Business",
+      level: "B2",
+      image: "/imgs/Meeting a new calleague.png",
+      quoteParts: ["I work at ", ", where I handle ", "."],
+      fillIns: 2,
       learners: "5.8K",
       progress: 33,
       completed: 5,
@@ -81,9 +94,9 @@ export default function Home() {
       title: "Ordering at a Restaurant",
       category: "Travel",
       level: "A2",
-      emoji: "🍽️",
-      quote: "I would like to order",
-      fillIn: "______",
+      image: "/imgs/Ording at restaurant.avif",
+      quoteParts: ["I would like to order ", "."],
+      fillIns: 1,
       learners: "4.2K",
       progress: 0,
       completed: 0,
@@ -145,6 +158,7 @@ export default function Home() {
       <div className="flex items-start gap-3 mb-6 animate-fade-in-up">
         <div className="relative flex-shrink-0 mt-1">
           <Avatar className="h-12 w-12 bg-navy shadow-md">
+            <AvatarImage src="/imgs/Aditi.png" alt="Aditi AI" />
             <AvatarFallback className="bg-navy">
               <Sparkles size={24} className="text-gold" />
             </AvatarFallback>
@@ -189,12 +203,15 @@ export default function Home() {
           </h2>
 
           {/* Thumbnail Image */}
-          <div className="relative h-40 bg-gradient-to-br from-teal via-teal-hover to-teal-active rounded-[20px] flex items-center justify-center overflow-hidden mb-4 border border-gray-200">
-            <div className="absolute inset-0 bg-black/5"></div>
-            <div className="relative text-center z-10">
-              <div className="text-6xl mb-2">{currentLesson.emoji}</div>
-            </div>
-            <div className="absolute bottom-3 right-3 bg-black/40 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+          <div className="relative h-40 rounded-[20px] overflow-hidden mb-4 border border-gray-200">
+            <Image
+              src={currentLesson.image}
+              alt={currentLesson.title}
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-black/10"></div>
+            <div className="absolute bottom-3 right-3 bg-black/40 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10">
               <Users size={14} />
               <span>{currentLesson.learners}</span>
             </div>
@@ -202,11 +219,16 @@ export default function Home() {
 
           {/* Quote */}
           <p className="text-text-primary text-base mb-5 text-center italic">
-            &quot;{currentLesson.quote}{" "}
-            <span className="text-navy font-semibold border-b-2 border-dashed border-navy/30">
-              {currentLesson.fillIn}
-            </span>
-            ?&quot;
+            &quot;{currentLesson.quoteParts.map((part, index) => (
+              <span key={index}>
+                {part}
+                {index < currentLesson.quoteParts.length - 1 && (
+                  <span className="text-navy font-semibold border-b-2 border-dashed border-navy/30">
+                    ______
+                  </span>
+                )}
+              </span>
+            ))}&quot;
           </p>
 
           {/* Progress Bar */}
@@ -412,6 +434,23 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* Hidden Reset Onboarding Button for Testing */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <Button
+          onClick={() => {
+            if (confirm('Reset onboarding? This will clear all user data and restart the onboarding flow.')) {
+              localStorage.removeItem('onboardingCompleted');
+              localStorage.removeItem('userData');
+              router.push('/onboarding');
+            }
+          }}
+          variant="outline"
+          className="opacity-20 hover:opacity-100 transition-opacity text-xs px-3 py-2 rounded-[8px]"
+        >
+          Reset Onboarding
+        </Button>
+      </div>
     </div>
   );
 }

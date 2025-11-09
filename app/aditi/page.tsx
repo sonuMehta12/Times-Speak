@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Sparkles, Volume2, Languages, Lightbulb, Mic, MessageCircle, Keyboard, ChevronDown, Star, Captions } from 'lucide-react';
+import { ArrowLeft, Sparkles, Volume2, Languages, Lightbulb, Mic, MessageCircle, Keyboard, ChevronDown, Star, Captions, MicOff, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { startLiveSession } from '@/lib/geminiLive';
+import type { LiveServerMessage } from '@google/genai';
 
 type Mode = 'chat' | 'call';
 type MessageSender = 'user' | 'ai';
@@ -28,7 +30,20 @@ interface Message {
 }
 
 export default function ChatPage() {
-  const userName = 'John';
+  const [userName, setUserName] = useState('John');
+  
+  // Load user data from localStorage
+  useEffect(() => {
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      try {
+        const parsedData = JSON.parse(userData);
+        setUserName(parsedData.userName || 'John');
+      } catch (err) {
+        console.error('Error parsing user data:', err);
+      }
+    }
+  }, []);
   const [mode, setMode] = useState<Mode>('chat');
   const [callDuration, setCallDuration] = useState(0);
   const [messages, setMessages] = useState<Message[]>([
@@ -134,13 +149,13 @@ export default function ChatPage() {
               </Button>
               <div className="relative">
                 <Avatar className="h-11 w-11">
-                  <AvatarImage src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=44&auto=format&fit=crop" />
-                  <AvatarFallback>SI</AvatarFallback>
+                  <AvatarImage src="/imgs/Aditi.png" />
+                  <AvatarFallback>AD</AvatarFallback>
                 </Avatar>
                 <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-success rounded-full border-2 border-white"></div>
               </div>
               <div>
-                <p className="font-bold text-text-primary leading-tight font-body">Sia</p>
+                <p className="font-bold text-text-primary leading-tight font-body">Aditi</p>
                 <p className="text-sm text-success font-medium font-body">Active now</p>
               </div>
             </div>
@@ -187,7 +202,7 @@ export default function ChatPage() {
               messagesEndRef={messagesEndRef} 
             />
           ) : (
-            <CallView userName={userName} />
+            <CallView userName={userName} callDuration={callDuration} />
           )}
         </main>
 
@@ -254,70 +269,266 @@ const ChatView: React.FC<{
   </div>
 );
 
-// Call View Component
-const CallView: React.FC<{ userName: string }> = ({ userName }) => {
+// Call View Component with Real Voice
+const CallView: React.FC<{ userName: string; callDuration: number }> = ({ userName, callDuration }) => {
+  const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(true);
+  const [userTranscript, setUserTranscript] = useState('');
+  const [aiTranscript, setAiTranscript] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const sessionRef = useRef<any>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const secs = (seconds % 60).toString().padStart(2, '0');
+    return `${minutes}:${secs}`;
+  };
+
+  const handleStartCall = async () => {
+    setIsConnecting(true);
+    setError(null);
+    
+    try {
+      // Get user profile from localStorage
+      const userData = localStorage.getItem('userData');
+      let userProfile = {};
+      
+      if (userData) {
+        try {
+          const parsedData = JSON.parse(userData);
+          userProfile = {
+            name: parsedData.userName || userName,
+            level: parsedData.selectedLevel || 'B2 (Upper-Intermediate)',
+            goals: parsedData.selectedGoals || [],
+            field: parsedData.selectedField || 'Computer Science',
+          };
+        } catch (err) {
+          console.error('Error parsing user data:', err);
+        }
+      }
+
+      const { session, stream } = await startLiveSession(
+        {
+          onMessage: (message: LiveServerMessage) => {
+            // Type guard to ensure serverContent is an object
+            if (message.serverContent && typeof message.serverContent === 'object') {
+              // Handle user transcript
+              const userText = message.serverContent.turnComplete?.parts?.[0]?.text;
+              if (userText) {
+                setUserTranscript(userText);
+              }
+
+              // Handle AI transcript
+              const aiText = message.serverContent.modelTurn?.parts?.[0]?.text;
+              if (aiText) {
+                setAiTranscript(aiText);
+              }
+            }
+          },
+          onError: (err: Error) => {
+            console.error('Session error:', err);
+            setError(err.message);
+            setIsConnected(false);
+          },
+          onClose: () => {
+            setIsConnected(false);
+            setIsConnecting(false);
+          },
+        },
+        userProfile
+      );
+
+      sessionRef.current = session;
+      streamRef.current = stream;
+      setIsConnected(true);
+      setIsConnecting(false);
+      setAiTranscript(`Hi ${userName}! I'm Aditi, your English teacher. How are you doing today? 😊`);
+    } catch (err: any) {
+      console.error('Failed to start call:', err);
+      setError(err.message || 'Failed to connect. Please check your microphone permissions.');
+      setIsConnecting(false);
+    }
+  };
+
+  const handleEndCall = () => {
+    if (sessionRef.current) {
+      try {
+        sessionRef.current.close();
+      } catch (err) {
+        console.error('Error closing session:', err);
+      }
+    }
+    
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    
+    setIsConnected(false);
+    setUserTranscript('');
+    setAiTranscript('');
+  };
+
+  const toggleMute = () => {
+    if (streamRef.current) {
+      streamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = !track.enabled;
+      });
+      setIsMuted(!isMuted);
+    }
+  };
+
   return (
-    <div className="h-full flex flex-col items-center justify-center bg-navy text-white p-4">
-      <div className="flex-1 flex flex-col items-center justify-center gap-8">
+    <div className="h-full flex flex-col items-center justify-between bg-gradient-to-b from-navy to-navy-hover text-white p-6">
+      {/* Top Section - Avatars and Status */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-6 w-full">
         {/* Avatars */}
-        <div className="flex items-center justify-center gap-6">
+        <div className="flex items-center justify-center gap-8">
           <div className="flex flex-col items-center gap-3">
             <div className="relative">
-              <Avatar className="w-32 h-32 border-4 border-teal shadow-2xl">
+              <Avatar className="w-28 h-28 border-4 border-teal shadow-2xl">
                 <AvatarImage 
-                  src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=120&auto=format&fit=crop" 
+                  src="/imgs/Aditi.png" 
                   className="object-cover"
                 />
-                <AvatarFallback>SI</AvatarFallback>
+                <AvatarFallback>AD</AvatarFallback>
               </Avatar>
-              <div className="absolute -bottom-2 -right-2 bg-white p-1 rounded-full">
-                <Mic className="h-5 w-5 text-teal" />
-              </div>
+              {isConnected && (
+                <div className="absolute -bottom-2 -right-2 bg-white p-2 rounded-full animate-pulse">
+                  <Mic className="h-4 w-4 text-teal" />
+                </div>
+              )}
             </div>
-            <p className="font-bold text-lg font-body">Sia</p>
+            <p className="font-bold text-base font-body">Aditi</p>
           </div>
           
           <div className="flex flex-col items-center gap-3">
             <div className="relative">
-              <Avatar className="w-32 h-32 border-4 border-coral/50 shadow-2xl">
-                <AvatarFallback className="bg-coral text-white font-bold text-5xl">
+              <Avatar className="w-28 h-28 border-4 border-coral/50 shadow-2xl">
+                <AvatarFallback className="bg-coral text-white font-bold text-4xl">
                   {userName.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <div className="absolute -bottom-2 -right-2 bg-white p-1 rounded-full">
-                <Mic className="h-5 w-5 text-coral" />
-              </div>
+              {isConnected && !isMuted && (
+                <div className="absolute -bottom-2 -right-2 bg-white p-2 rounded-full animate-pulse">
+                  <Mic className="h-4 w-4 text-coral" />
+                </div>
+              )}
             </div>
-            <p className="font-bold text-lg font-body">{userName}</p>
+            <p className="font-bold text-base font-body">{userName}</p>
           </div>
         </div>
-        
-        <p className="text-white/70 text-center font-body">
-          Your call has started.<br/>Tap the microphone to speak.
-        </p>
+
+        {/* Status Message */}
+        {!isConnected && !isConnecting && !error && (
+          <p className="text-white/70 text-center font-body text-sm">
+            Ready to practice English?<br/>Tap the call button to start.
+          </p>
+        )}
+
+        {isConnecting && (
+          <p className="text-white/90 text-center font-body text-sm animate-pulse">
+            Connecting to Aditi...
+          </p>
+        )}
+
+        {error && (
+          <Card className="bg-error/10 border-error/30 rounded-[16px] p-4 max-w-sm">
+            <p className="text-error text-sm text-center font-body">{error}</p>
+          </Card>
+        )}
+
+        {/* Live Transcripts */}
+        {isConnected && showTranscript && (
+          <div className="w-full max-w-md space-y-3 animate-fade-in-up">
+            {aiTranscript && (
+              <Card className="bg-white/10 backdrop-blur-sm border-white/20 rounded-[16px]">
+                <CardContent className="p-3">
+                  <p className="text-xs text-teal font-semibold mb-1">Aditi:</p>
+                  <p className="text-sm text-white/90 font-body">{aiTranscript}</p>
+                </CardContent>
+              </Card>
+            )}
+            
+            {userTranscript && (
+              <Card className="bg-white/10 backdrop-blur-sm border-white/20 rounded-[16px]">
+                <CardContent className="p-3">
+                  <p className="text-xs text-coral font-semibold mb-1">You:</p>
+                  <p className="text-sm text-white/90 font-body">{userTranscript}</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </div>
       
-      {/* Action Buttons */}
+      {/* Bottom Section - Action Buttons */}
       <div className="flex justify-center items-center gap-6 w-full pb-4">
-        <button className="flex flex-col items-center gap-1.5 text-white/80 hover:text-white transition-colors">
-          <div className="h-16 w-16 bg-white/10 rounded-[20px] flex items-center justify-center text-white shadow-sm hover:bg-white/20 transition-all">
-            <Captions className="h-7 w-7" />
+        {/* Transcript Toggle */}
+        <button 
+          onClick={() => setShowTranscript(!showTranscript)}
+          className="flex flex-col items-center gap-1.5 text-white/80 hover:text-white transition-colors"
+        >
+          <div className={`h-14 w-14 rounded-[16px] flex items-center justify-center shadow-sm transition-all ${
+            showTranscript ? 'bg-white/20' : 'bg-white/10 hover:bg-white/15'
+          }`}>
+            <Captions className="h-6 w-6" />
           </div>
           <span className="text-xs font-semibold font-body">CC</span>
         </button>
         
-        <button className="flex flex-col items-center gap-1.5 text-white transition-colors">
-          <div className="h-20 w-20 bg-coral text-white rounded-full flex items-center justify-center shadow-lg hover:bg-coral-hover transition-all transform hover:scale-105">
-            <Mic className="h-9 w-9" />
-          </div>
-        </button>
+        {/* Main Call Button */}
+        {!isConnected ? (
+          <button 
+            onClick={handleStartCall}
+            disabled={isConnecting}
+            className="flex flex-col items-center gap-1.5 text-white transition-colors disabled:opacity-50"
+          >
+            <div className="h-20 w-20 bg-success text-white rounded-full flex items-center justify-center shadow-lg hover:bg-success/90 transition-all transform hover:scale-105 disabled:hover:scale-100">
+              <Phone className="h-8 w-8" />
+            </div>
+            <span className="text-xs font-semibold font-body">
+              {isConnecting ? 'Connecting...' : 'Start Call'}
+            </span>
+          </button>
+        ) : (
+          <button 
+            onClick={isMuted ? toggleMute : handleEndCall}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              toggleMute();
+            }}
+            className="flex flex-col items-center gap-1.5 text-white transition-colors"
+          >
+            <div className={`h-20 w-20 rounded-full flex items-center justify-center shadow-lg transition-all transform hover:scale-105 ${
+              isMuted ? 'bg-coral' : 'bg-error hover:bg-error/90'
+            }`}>
+              {isMuted ? <MicOff className="h-8 w-8" /> : <Phone className="h-8 w-8" />}
+            </div>
+            <span className="text-xs font-semibold font-body">
+              {isMuted ? 'Unmute' : 'End Call'}
+            </span>
+          </button>
+        )}
         
-        <button className="flex flex-col items-center gap-1.5 text-white/80 hover:text-white transition-colors">
-          <div className="h-16 w-16 bg-white/10 rounded-[20px] flex items-center justify-center text-white shadow-sm hover:bg-white/20 transition-all">
-            <Lightbulb className="h-7 w-7" />
-          </div>
-          <span className="text-xs font-semibold font-body">Hint</span>
-        </button>
+        {/* Mute Toggle (only show when connected) */}
+        {isConnected && (
+          <button 
+            onClick={toggleMute}
+            className="flex flex-col items-center gap-1.5 text-white/80 hover:text-white transition-colors"
+          >
+            <div className={`h-14 w-14 rounded-[16px] flex items-center justify-center shadow-sm transition-all ${
+              isMuted ? 'bg-error/30' : 'bg-white/10 hover:bg-white/15'
+            }`}>
+              {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+            </div>
+            <span className="text-xs font-semibold font-body">
+              {isMuted ? 'Muted' : 'Mute'}
+            </span>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -328,8 +539,8 @@ const MessageAvatar: React.FC<{ sender: MessageSender; userName: string }> = ({ 
   if (sender === 'ai') {
     return (
       <Avatar className="w-8 h-8 self-end flex-shrink-0">
-        <AvatarImage src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=32&auto=format&fit=crop" />
-        <AvatarFallback>SI</AvatarFallback>
+        <AvatarImage src="/imgs/Aditi.png" />
+        <AvatarFallback>AD</AvatarFallback>
       </Avatar>
     );
   }
@@ -456,7 +667,10 @@ const FeedbackSection: React.FC<{ feedback: Message['feedback'] }> = ({ feedback
 // Typing Indicator Component
 const TypingIndicator: React.FC<{ userName: string }> = ({ userName }) => (
   <div className="flex w-full items-start gap-3 justify-start animate-fade-in-up">
-    <MessageAvatar sender="ai" userName={userName} />
+    <Avatar className="w-8 h-8 self-end flex-shrink-0">
+      <AvatarImage src="/imgs/Aditi.png" />
+      <AvatarFallback>AD</AvatarFallback>
+    </Avatar>
     <Card className="border-0 bg-white rounded-[20px] rounded-bl-lg shadow-sm">
       <CardContent className="p-3">
         <div className="flex items-center gap-1.5">

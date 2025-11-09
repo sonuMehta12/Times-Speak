@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {PageHeader} from "@/components/PageHeader";
 import {
   Play,
@@ -16,10 +16,55 @@ import {
   Target,
   Zap,
   ArrowRight,
+  Square,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+
+// Web Speech API type definitions
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+interface SpeechRecognitionEvent extends Event {
+  results: {
+    [key: number]: {
+      [key: number]: {
+        transcript: string;
+      };
+    };
+  };
+}
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  onstart: () => void;
+  onresult: (e: SpeechRecognitionEvent) => void;
+  onerror: (e: SpeechRecognitionErrorEvent) => void;
+  onend: () => void;
+}
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
+
+interface WordComparison {
+  word: string;
+  isCorrect: boolean;
+}
+
+interface PronunciationFeedback {
+  overallScore: number;
+  wordScores: WordComparison[];
+  generalFeedback: string;
+  transcript: string;
+}
 
 type BaseQuestion = {
   id: number;
@@ -95,6 +140,10 @@ export default function QuizPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [dragWords, setDragWords] = useState<string[]>([]);
   const [audioPlayed, setAudioPlayed] = useState(false);
+  const [selectedPhraseIndex, setSelectedPhraseIndex] = useState<number | null>(null);
+  const [recordingState, setRecordingState] = useState<'idle' | 'recording' | 'processing' | 'feedback'>('idle');
+  const [speakingFeedback, setSpeakingFeedback] = useState<PronunciationFeedback | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const quizQuestions: QuizQuestion[] = [
     {
@@ -181,11 +230,11 @@ export default function QuizPage() {
       id: 7,
       type: "speaking",
       question: "Now it's your turn to speak!",
-      prompt: "Choose ONE phrase and complete it with your own information:",
+      prompt: "Choose ONE phrase and practice speaking it clearly:",
       options: [
-        "I work at ___, where I handle ___.",
-        "I'm currently focusing on ___.",
-        "I'm responsible for ___, which helps us ___.",
+        "I work at Microsoft, where I handle customer support.",
+        "I'm currently focusing on improving our customer service response times.",
+        "I'm responsible for onboarding new clients, which helps us reduce setup time.",
       ],
     },
   ];
@@ -209,6 +258,173 @@ export default function QuizPage() {
     });
   };
 
+  const analyzePronunciation = (spoken: string, target: string) => {
+    const spokenWords = spoken.toLowerCase().replace(/[.,!?]/g, '').split(/\s+/).filter(Boolean);
+    const targetWords = target.toLowerCase().replace(/[.,!?]/g, '').split(/\s+/).filter(Boolean);
+
+    let correctWords = 0;
+    const wordScores: WordComparison[] = targetWords.map((targetWord, index) => {
+      const spokenWord = spokenWords[index] || '';
+      const isCorrect = targetWord.trim() === spokenWord.trim();
+      if (isCorrect) correctWords++;
+      
+      return {
+        word: targetWord,
+        isCorrect: isCorrect,
+      };
+    });
+
+    const overallScore = targetWords.length > 0 ? Math.round((correctWords / targetWords.length) * 100) : 0;
+
+    let generalFeedback = '';
+    if (overallScore === 100) generalFeedback = "Perfect pronunciation! 🎉";
+    else if (overallScore >= 80) generalFeedback = "Excellent! Very close to the target.";
+    else if (overallScore >= 50) generalFeedback = "Good effort! A few words to work on.";
+    else generalFeedback = "Keep practicing! You can do it.";
+    
+    setSpeakingFeedback({
+      overallScore,
+      wordScores,
+      generalFeedback,
+      transcript: spoken
+    });
+    setRecordingState('feedback');
+    setShowFeedback(true);
+    setUserAnswers({
+      ...userAnswers,
+      [question.id]: { answer: "recorded", correct: overallScore >= 70 },
+    });
+  };
+
+  useEffect(() => {
+    if (question.type === 'speaking' && selectedPhraseIndex !== null) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognitionInstance = new SpeechRecognition();
+        recognitionInstance.continuous = false;
+        recognitionInstance.interimResults = false;
+        recognitionInstance.lang = 'en-US';
+
+        recognitionInstance.onstart = () => {
+          setIsRecording(true);
+          setRecordingState('recording');
+        };
+        
+        recognitionInstance.onresult = (event) => {
+          const spokenText = event.results[0][0].transcript;
+          const targetPhrase = question.options[selectedPhraseIndex].replace(/_+/g, '').trim();
+          analyzePronunciation(spokenText, targetPhrase);
+        };
+
+        recognitionInstance.onerror = (event) => {
+          console.error('Speech recognition error:', event.error);
+          setIsRecording(false);
+          setRecordingState('idle');
+        };
+
+        recognitionInstance.onend = () => {
+          setIsRecording(false);
+          if (recordingState === 'recording') {
+            setRecordingState('processing');
+          }
+        };
+
+        recognitionRef.current = recognitionInstance;
+      }
+    }
+  }, [selectedPhraseIndex, question]);
+
+  const handleStartSpeakingRecording = async () => {
+    if (selectedPhraseIndex === null) {
+      alert("Please select a phrase first!");
+      return;
+    }
+    setSpeakingFeedback(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      recognitionRef.current?.start();
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      alert("Microphone access denied. Please enable it in your browser settings.");
+    }
+  };
+
+  const handleStopSpeakingRecording = () => {
+    if (recognitionRef.current && recordingState === 'recording') {
+      setRecordingState('processing');
+      recognitionRef.current.stop();
+    }
+  };
+
+  const playSpeakingPhrase = () => {
+    if (selectedPhraseIndex === null) {
+      alert("Please select a phrase first!");
+      return;
+    }
+    if (!('speechSynthesis' in window)) {
+      alert("Your browser does not support text-to-speech.");
+      return;
+    }
+    const targetPhrase = question.type === 'speaking' ? question.options[selectedPhraseIndex].replace(/_+/g, '').trim() : '';
+    const utterance = new SpeechSynthesisUtterance(targetPhrase);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.9;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const playListeningAudio = () => {
+    if (question.type !== 'listening') return;
+    
+    if (!('speechSynthesis' in window)) {
+      alert("Your browser does not support text-to-speech.");
+      return;
+    }
+    
+    setIsPlaying(true);
+    setAudioPlayed(true);
+    
+    const utterance = new SpeechSynthesisUtterance(question.audio);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.9;
+    
+    utterance.onend = () => {
+      setIsPlaying(false);
+    };
+    
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const playStressAudio = (optionIndex: number) => {
+    if (question.type !== 'audio-stress') return;
+    
+    if (!('speechSynthesis' in window)) {
+      alert("Your browser does not support text-to-speech.");
+      return;
+    }
+    
+    setIsPlaying(true);
+    
+    const utterance = new SpeechSynthesisUtterance(question.sentence.replace(/"/g, ''));
+    utterance.lang = 'en-US';
+    
+    // Audio A: robotic (even stress) - slower rate
+    // Audio B: natural stress - normal rate with emphasis
+    if (optionIndex === 0) {
+      utterance.rate = 0.7; // Slower, more robotic
+      utterance.pitch = 1.0; // Flat pitch
+    } else {
+      utterance.rate = 0.9; // Natural speed
+      utterance.pitch = 1.1; // Slightly varied pitch for natural stress
+    }
+    
+    utterance.onend = () => {
+      setIsPlaying(false);
+    };
+    
+    window.speechSynthesis.speak(utterance);
+  };
+
   const handleNext = () => {
     if (currentQuestion === quizQuestions.length - 1) {
       setQuizState("results");
@@ -219,6 +435,9 @@ export default function QuizPage() {
       setDragWords([]);
       setAudioPlayed(false);
       setIsRecording(false);
+      setSelectedPhraseIndex(null);
+      setRecordingState('idle');
+      setSpeakingFeedback(null);
     }
   };
 
@@ -352,11 +571,9 @@ export default function QuizPage() {
                 <Card className="bg-gradient-to-br from-teal to-teal-hover rounded-[20px] p-5 mb-5 shadow-sm border-0">
                   <div className="flex items-center gap-4">
                     <Button
-                      onClick={() => {
-                        setIsPlaying(!isPlaying);
-                        setAudioPlayed(true);
-                      }}
-                      className="w-14 h-14 bg-white hover:bg-white rounded-[16px] flex items-center justify-center hover:scale-105 transition-all shadow-sm flex-shrink-0"
+                      onClick={playListeningAudio}
+                      disabled={isPlaying}
+                      className="w-14 h-14 bg-white hover:bg-white rounded-[16px] flex items-center justify-center hover:scale-105 transition-all shadow-sm flex-shrink-0 disabled:opacity-50"
                     >
                       {isPlaying ? (
                         <div className="w-3 h-3 bg-teal rounded"></div>
@@ -735,9 +952,10 @@ export default function QuizPage() {
                         <Button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setIsPlaying(!isPlaying);
+                            playStressAudio(index);
                           }}
-                          className={`w-full py-2.5 rounded-[12px] font-medium transition-all flex items-center justify-center gap-2 text-sm ${
+                          disabled={isPlaying}
+                          className={`w-full py-2.5 rounded-[12px] font-medium transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50 ${
                             isSelected
                               ? "bg-teal text-white hover:bg-teal-hover"
                               : "bg-white border-2 border-gray-200 text-navy hover:border-teal hover:bg-teal/5"
@@ -832,72 +1050,105 @@ export default function QuizPage() {
                   </p>
                   <div className="space-y-2">
                     {question.options.map((option, index) => (
-                      <div
+                      <button
                         key={index}
-                        className="flex items-start gap-2 p-3 bg-white rounded-[16px] border border-gray-200"
+                        onClick={() => setSelectedPhraseIndex(index)}
+                        className={`w-full flex items-start gap-2 p-3 rounded-[16px] border-2 transition-all ${
+                          selectedPhraseIndex === index
+                            ? 'bg-teal/10 border-teal'
+                            : 'bg-white border-gray-200 hover:border-teal/50'
+                        }`}
                       >
-                        <div className="w-5 h-5 bg-teal/10 rounded-[8px] flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-teal font-bold text-xs">
+                        <div className={`w-5 h-5 rounded-[8px] flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                          selectedPhraseIndex === index ? 'bg-teal' : 'bg-teal/10'
+                        }`}>
+                          <span className={`font-bold text-xs ${
+                            selectedPhraseIndex === index ? 'text-white' : 'text-teal'
+                          }`}>
                             {index + 1}
                           </span>
                         </div>
-                        <p className="text-sm text-text-primary font-body">
+                        <p className="text-sm text-text-primary font-body text-left">
                           {option}
                         </p>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </Card>
 
-                <div className="text-center py-4">
-                  <Button
-                    onClick={() => {
-                      setIsRecording(!isRecording);
-                      if (!isRecording) {
-                        setTimeout(() => {
-                          setIsRecording(false);
-                          setSelectedAnswer("recorded");
-                          setShowFeedback(true);
-                          setUserAnswers({
-                            ...userAnswers,
-                            [question.id]: { answer: "recorded", correct: true },
-                          });
-                        }, 3000);
-                      }
-                    }}
-                    className={`w-24 h-24 rounded-[24px] flex items-center justify-center mx-auto mb-5 transition-all shadow-md ${
-                      isRecording
-                        ? "bg-coral animate-pulse scale-110 hover:bg-coral"
-                        : "bg-coral hover:bg-coral-hover hover:scale-110"
-                    }`}
-                  >
-                    <Mic className="w-10 h-10 text-white" />
-                  </Button>
+                {selectedPhraseIndex !== null && !showFeedback && (
+                  <div className="mb-4 text-center">
+                    <button
+                      onClick={playSpeakingPhrase}
+                      className="bg-teal/10 text-teal py-2 px-4 rounded-full font-semibold text-sm flex items-center gap-2 hover:bg-teal/20 transition-colors mx-auto"
+                    >
+                      <Volume2 className="h-4 w-4" /> Listen to phrase
+                    </button>
+                  </div>
+                )}
 
-                  <p className="text-lg font-semibold text-navy mb-1 font-display">
-                    {isRecording ? "Recording..." : "Tap to Record"}
-                  </p>
-                  <p className="text-sm text-text-secondary mb-6 font-body">
-                    {isRecording
-                      ? "Speak clearly and naturally"
-                      : "Press and hold to start speaking"}
-                  </p>
+                {!showFeedback && (
+                  <div className="text-center py-4">
+                    {recordingState === 'recording' ? (
+                      <Button
+                        onClick={handleStopSpeakingRecording}
+                        className="w-24 h-24 rounded-[24px] flex items-center justify-center mx-auto mb-5 bg-coral hover:bg-coral-hover animate-pulse scale-110 shadow-md"
+                      >
+                        <Square className="w-10 h-10 text-white" />
+                      </Button>
+                    ) : recordingState === 'processing' ? (
+                      <div className="w-24 h-24 rounded-[24px] flex items-center justify-center mx-auto mb-5 bg-navy/20">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy"></div>
+                      </div>
+                    ) : (
+                      <Button
+                        onClick={handleStartSpeakingRecording}
+                        disabled={selectedPhraseIndex === null}
+                        className={`w-24 h-24 rounded-[24px] flex items-center justify-center mx-auto mb-5 transition-all shadow-md ${
+                          selectedPhraseIndex === null
+                            ? 'bg-gray-300 cursor-not-allowed'
+                            : 'bg-coral hover:bg-coral-hover hover:scale-110'
+                        }`}
+                      >
+                        <Mic className="w-10 h-10 text-white" />
+                      </Button>
+                    )}
 
-                  {isRecording && (
-                    <div className="flex items-center justify-center gap-1 mb-4">
-                      {[...Array(20)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="w-1 bg-coral rounded-full animate-pulse"
-                          style={{
-                            height: `${Math.random() * 40 + 10}px`,
-                            animationDelay: `${i * 0.05}s`,
-                          }}
-                        ></div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                    <p className="text-lg font-semibold text-navy mb-1 font-display">
+                      {recordingState === 'recording' 
+                        ? "Recording..." 
+                        : recordingState === 'processing'
+                        ? "Processing..."
+                        : selectedPhraseIndex === null
+                        ? "Select a phrase first"
+                        : "Tap to Record"}
+                    </p>
+                    <p className="text-sm text-text-secondary mb-6 font-body">
+                      {recordingState === 'recording'
+                        ? "Speak clearly and naturally"
+                        : recordingState === 'processing'
+                        ? "Analyzing your pronunciation..."
+                        : selectedPhraseIndex === null
+                        ? "Choose one of the phrases above"
+                        : "Press to start speaking"}
+                    </p>
+
+                    {recordingState === 'recording' && (
+                      <div className="flex items-center justify-center gap-1 mb-4">
+                        {[...Array(20)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="w-1 bg-coral rounded-full animate-pulse"
+                            style={{
+                              height: `${Math.random() * 40 + 10}px`,
+                              animationDelay: `${i * 0.05}s`,
+                            }}
+                          ></div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
 
@@ -940,60 +1191,38 @@ export default function QuizPage() {
               </Card>
             )}
 
-            {showFeedback && question.type === "speaking" && (
-              <Card className="mt-6 p-5 rounded-[20px] border-2 bg-success/10 border-success/30">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-[16px] flex items-center justify-center flex-shrink-0 bg-success">
-                    <Check className="w-6 h-6 text-white" />
+            {showFeedback && question.type === "speaking" && speakingFeedback && (
+              <Card className="mt-6 p-5 rounded-[20px] border-2 bg-teal/10 border-teal/30">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="text-5xl font-bold text-teal">{speakingFeedback.overallScore}</div>
+                  <div>
+                    <p className="font-semibold text-text-primary">Overall Score</p>
+                    <p className="text-text-secondary text-sm">{speakingFeedback.generalFeedback}</p>
                   </div>
-                  <div className="flex-1">
-                    <div className="text-lg font-bold mb-3 text-success font-display">
-                      Great job! 🎉
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between p-3 bg-white rounded-[12px] border border-gray-200">
-                        <span className="text-text-primary font-medium font-body text-sm">
-                          Grammar
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-20 bg-gray-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-success w-[85%]"></div>
-                          </div>
-                          <span className="text-success font-bold font-body text-sm">
-                            85%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-white rounded-[12px] border border-gray-200">
-                        <span className="text-text-primary font-medium font-body text-sm">
-                          Pronunciation
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-20 bg-gray-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-success w-[90%]"></div>
-                          </div>
-                          <span className="text-success font-bold font-body text-sm">
-                            90%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-white rounded-[12px] border border-gray-200">
-                        <span className="text-text-primary font-medium font-body text-sm">
-                          Fluency
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-20 bg-gray-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-success w-[80%]"></div>
-                          </div>
-                          <span className="text-success font-bold font-body text-sm">
-                            80%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <Card className="text-xs text-text-primary mt-3 bg-success/10 p-3 rounded-[12px] border-success/20">
-                      💡 <strong>Tip:</strong> Try to emphasize the key words more for better natural flow.
-                    </Card>
+                </div>
+
+                {speakingFeedback.transcript && (
+                  <div className="mb-4 p-4 bg-white rounded-[12px]">
+                    <h4 className="font-semibold text-text-primary mb-2 text-sm">You said:</h4>
+                    <p className="text-base text-text-secondary italic">"{speakingFeedback.transcript}"</p>
+                  </div>
+                )}
+                
+                <div className="p-4 bg-white rounded-[12px]">
+                  <h4 className="font-semibold text-text-primary mb-3 text-sm">Word Analysis</h4>
+                  <div className="flex flex-wrap gap-2 text-base font-medium">
+                    {speakingFeedback.wordScores.map((ws, i) => (
+                      <span
+                        key={i}
+                        className={`px-3 py-1.5 rounded-[8px] ${
+                          ws.isCorrect
+                            ? 'text-teal bg-teal/10'
+                            : 'text-coral bg-coral/10'
+                        }`}
+                      >
+                        {ws.word}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </Card>

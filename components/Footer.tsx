@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, BookOpen, Compass, User } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Footer() {
   const pathname = usePathname();
@@ -46,13 +46,14 @@ export default function Footer() {
                   }`}
                 />
 
-                {/* AI Avatar - Female representation */}
+                {/* AI Avatar - Aditi */}
                 <div className="relative">
                   <Avatar
                     className={`w-8 h-8 border-2 transition-all ${
                       active ? "border-navy shadow-navy" : "border-navy/30"
                     }`}
                   >
+                    <AvatarImage src="/imgs/Aditi.png" alt="Aditi AI" />
                     <AvatarFallback
                       className={`font-bold text-xs transition-colors ${
                         active ? "bg-navy text-white" : "bg-navy/10 text-navy"
