@@ -314,21 +314,22 @@ const CallView: React.FC<{ userName: string; callDuration: number }> = ({ userNa
         {
           onMessage: (message: LiveServerMessage) => {
             // Type guard to ensure serverContent is an object
-            if (message.serverContent && typeof message.serverContent === 'object') {
+            const serverContent = message.serverContent;
+            if (serverContent && typeof serverContent === 'object') {
               // Handle user transcript (real-time updates)
-              const userText = message.serverContent.turnComplete?.parts?.[0]?.text;
+              const userText = (serverContent as any).turnComplete?.parts?.[0]?.text;
               if (userText) {
                 setUserTranscript(userText);
               }
 
               // Handle AI transcript (real-time updates during model turn)
-              const aiText = message.serverContent.modelTurn?.parts?.[0]?.text;
+              const aiText = (serverContent as any).modelTurn?.parts?.[0]?.text;
               if (aiText) {
                 setAiTranscript(aiText);
               }
 
               // Handle interrupted state - clear AI transcript when interrupted
-              if (message.serverContent.interrupted) {
+              if ((serverContent as any).interrupted) {
                 // User interrupted, keep the last user transcript visible
               }
             }
