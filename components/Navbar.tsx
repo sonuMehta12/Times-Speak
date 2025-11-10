@@ -51,13 +51,7 @@ export default function Navbar() {
 
         {/* Right Side Actions */}
         <div className="flex items-center gap-3">
-          {/* Streak Counter */}
-          <div className="flex items-center gap-1.5 bg-orange-50 px-3 py-1.5 rounded-full">
-            <Flame className="w-4 h-4 text-orange-500" fill="#f97316" />
-            <span className="text-sm font-semibold text-orange-700">
-              {streak}
-            </span>
-          </div>
+
 
           {/* Language Picker */}
           <DropdownMenu>

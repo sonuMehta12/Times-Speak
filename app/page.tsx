@@ -19,6 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
+import StreakProgressWidget from "@/components/StreakProgressWidget";
 
 export default function Home() {
   const router = useRouter();
@@ -155,7 +156,7 @@ export default function Home() {
   return (
     <div className="w-full">
       {/* AI Greeting Card */}
-      <div className="flex items-start gap-3 mb-6 animate-fade-in-up">
+      {/* <div className="flex items-start gap-3 mb-6 animate-fade-in-up">
         <div className="relative flex-shrink-0 mt-1">
           <Avatar className="h-12 w-12 bg-navy shadow-md">
             <AvatarImage src="/imgs/Aditi.png" alt="Aditi AI" />
@@ -174,7 +175,17 @@ export default function Home() {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </div> */}
+
+<StreakProgressWidget 
+  userName={userName}
+  currentStreak={5}
+  userRank={3}
+  userPoints={2650}
+  weeklyGoalProgress={0}
+  weeklyGoalCurrent={5}
+  weeklyGoalTarget={7}
+/>
 
       {/* Today's Lesson Card */}
       <Card
@@ -232,7 +243,7 @@ export default function Home() {
           </p>
 
           {/* Progress Bar */}
-          <div className="mb-5">
+          {/* <div className="mb-5">
             <div className="flex justify-between items-center text-xs text-text-secondary mb-2.5">
               <span className="font-medium">
                 {currentLesson.completed} of {currentLesson.total} min completed
@@ -247,7 +258,7 @@ export default function Home() {
                 style={{ width: `${currentLesson.progress}%` }}
               ></div>
             </div>
-          </div>
+          </div> */}
 
           {/* Buttons */}
           <div className="flex items-stretch gap-2.5">

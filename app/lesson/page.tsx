@@ -14,6 +14,9 @@ import {
   Volume2,
   RefreshCw,
   Square,
+  SkipForward,
+  Pause,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -136,13 +139,15 @@ const transcriptData = [
 export default function LessonPage() {
   const router = useRouter();
   const [isRecording, setIsRecording] = useState(false);
-  const [activeTab, setActiveTab] = useState("practice");
+  const [activeTab, setActiveTab] = useState("quiz");
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [rolePlayCompleted, setRolePlayCompleted] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [showTranscript, setShowTranscript] = useState(false);
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
+  const [currentLesson, setCurrentLesson] = useState(1);
+  const [completedLessons, setCompletedLessons] = useState<number[]>([]);
   const [recordingState, setRecordingState] = useState<'idle' | 'recording' | 'processing' | 'feedback'>('idle');
   const [feedback, setFeedback] = useState<PronunciationFeedback | null>(null);
   const [transcript, setTranscript] = useState('');
@@ -388,7 +393,7 @@ export default function LessonPage() {
       <div className="fixed inset-0 flex flex-col bg-bg-card max-w-[393px] mx-auto left-0 right-0 z-50">
         {/* Header */}
         <header className="flex-shrink-0 bg-white/95 backdrop-blur-lg z-20 border-b border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between p-4">
+          <div className="flex items-center justify-between p-4 pb-2">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <Button
                 variant="ghost"
@@ -404,7 +409,7 @@ export default function LessonPage() {
                   Meeting a new Colleague
                 </p>
                 <p className="text-xs text-text-secondary">
-                  Unit 1 • Phrase 1 of 5
+                  Unit 1 • Lesson {currentLesson} of 5
                 </p>
               </div>
             </div>
@@ -416,157 +421,192 @@ export default function LessonPage() {
               <MoreVertical className="h-5 w-5" />
             </Button>
           </div>
+          
+          {/* Progress Bar with Lesson Checkpoints */}
+          <div className="px-4 pb-3">
+            <div className="relative">
+              {/* Progress Line */}
+              <div className="absolute top-4 left-0 right-0 h-1 bg-gray-200 rounded-full">
+                <div 
+                  className="h-full bg-gradient-to-r from-navy to-teal rounded-full transition-all duration-500"
+                  style={{ width: `${((currentLesson - 1) / 4) * 100}%` }}
+                />
+              </div>
+              
+              {/* Lesson Checkpoints */}
+              <div className="relative flex justify-between">
+                {[1, 2, 3, 4, 5].map((lesson) => {
+                  const isCompleted = completedLessons.includes(lesson);
+                  const isCurrent = lesson === currentLesson;
+                  const isLocked = lesson > currentLesson;
+                  
+                  return (
+                    <div key={lesson} className="flex flex-col items-center">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
+                          isCompleted
+                            ? 'bg-gradient-to-br from-teal to-teal-600 text-white shadow-md'
+                            : isCurrent
+                            ? 'bg-gradient-to-br from-navy to-navy-hover text-white shadow-lg ring-4 ring-navy/20'
+                            : 'bg-white border-2 border-gray-300 text-gray-400'
+                        }`}
+                      >
+                        {isCompleted ? <Check className="h-4 w-4" /> : `L${lesson}`}
+                      </div>
+                      <span className={`text-[10px] mt-1 font-medium ${
+                        isCurrent ? 'text-navy' : isCompleted ? 'text-teal' : 'text-gray-400'
+                      }`}>
+                        {isCurrent ? 'Current' : isCompleted ? 'Done' : isLocked ? 'Locked' : ''}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </header>
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
-          {/* Video Section */}
-          <div className="relative w-full h-[40vh] bg-gradient-to-br from-navy via-navy-hover to-navy group">
-            {/* Video Player */}
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              controlsList="nodownload"
-              preload="metadata"
-              onPlay={handleVideoPlay}
-              onPause={handleVideoPause}
-              onEnded={handleVideoPause}
-              onTimeUpdate={handleTimeUpdate}
-            >
-              <source src="/videos/5_Phrases_to_Describe_Work.mp4" type="video/mp4" />
-              Your browser does not support the video tag.
-            </video>
-
-            {/* Custom Play Button Overlay */}
-            {!isVideoPlaying && (
-              <div 
-                className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center cursor-pointer transition-all duration-300 hover:bg-black/50"
-                onClick={handlePlayVideo}
+          {/* Video Section - 16:9 Aspect Ratio */}
+          <div className="relative w-full bg-black">
+            <div className="relative w-full group" style={{ paddingBottom: '56.25%' }}>
+              {/* Video Player */}
+              <video
+                ref={videoRef}
+                className="absolute top-0 left-0 w-full h-full object-contain"
+                controlsList="nodownload"
+                preload="metadata"
+                onPlay={handleVideoPlay}
+                onPause={handleVideoPause}
+                onEnded={handleVideoPause}
+                onTimeUpdate={handleTimeUpdate}
               >
-                <div className="w-20 h-20 rounded-full bg-white shadow-2xl flex items-center justify-center transform transition-all duration-300 hover:scale-110 hover:shadow-white/20">
-                  <Play className="h-9 w-9 text-navy ml-1" fill="currentColor" />
-                </div>
-              </div>
-            )}
+                <source src="/videos/5_Phrases_to_Describe_Work.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
 
-            {/* Video Controls Bar (appears on hover when playing) */}
-            {isVideoPlaying && (
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => videoRef.current?.paused ? videoRef.current?.play() : videoRef.current?.pause()}
-                    className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-                  >
-                    {isVideoPlaying ? (
-                      <div className="w-3 h-3 flex gap-1">
-                        <div className="w-1 h-3 bg-white rounded-sm" />
-                        <div className="w-1 h-3 bg-white rounded-sm" />
-                      </div>
-                    ) : (
-                      <Play className="h-4 w-4 text-white ml-0.5" fill="currentColor" />
-                    )}
-                  </button>
-                  
-                  <div className="flex-1 flex items-center gap-2 text-white text-xs">
-                    <span className="font-medium">5 Phrases to Describe Work</span>
+              {/* Play/Pause Button Overlay - Center (Always Visible on Hover) */}
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300 bg-black/20">
+                <button
+                  onClick={() => {
+                    if (videoRef.current) {
+                      if (videoRef.current.paused) {
+                        videoRef.current.play();
+                      } else {
+                        videoRef.current.pause();
+                      }
+                    }
+                  }}
+                  className="w-20 h-20 rounded-full bg-white shadow-2xl flex items-center justify-center transform transition-all duration-300 hover:scale-110 hover:shadow-white/20 z-10"
+                >
+                  {isVideoPlaying ? (
+                    <Pause className="h-9 w-9 text-navy" />
+                  ) : (
+                    <Play className="h-9 w-9 text-navy ml-1" fill="currentColor" />
+                  )}
+                </button>
+              </div>
+              
+              {/* Initial Play Button (Only when video hasn't started) */}
+              {!isVideoPlaying && currentTime === 0 && (
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center pointer-events-none">
+                  <div className="w-20 h-20 rounded-full bg-white shadow-2xl flex items-center justify-center">
+                    <Play className="h-9 w-9 text-navy ml-1" fill="currentColor" />
                   </div>
-
-                  <button
-                    onClick={() => videoRef.current?.requestFullscreen()}
-                    className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                    </svg>
-                  </button>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Lesson Badge */}
-            <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md rounded-full px-4 py-2 flex items-center gap-2">
-              <div className="w-2 h-2 bg-coral rounded-full animate-pulse" />
-              <span className="text-white text-xs font-semibold">Phrase 1 of 5</span>
+              {/* Previous Button - Left Side */}
+              <button
+                onClick={() => {
+                  if (videoRef.current) {
+                    videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+                  }
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-black/80 transition-all z-10 opacity-0 hover:opacity-100 group-hover:opacity-100"
+                aria-label="Previous 10 seconds"
+              >
+                <ChevronLeft className="h-6 w-6 text-white" />
+              </button>
+
+              {/* Next Button - Right Side */}
+              <button
+                onClick={() => {
+                  if (videoRef.current) {
+                    videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 10);
+                  }
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-black/80 transition-all z-10 opacity-0 hover:opacity-100 group-hover:opacity-100"
+                aria-label="Next 10 seconds"
+              >
+                <ChevronRight className="h-6 w-6 text-white" />
+              </button>
+
+              {/* Lesson Badge - Top Left */}
+              {/* <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md rounded-full px-4 py-2 flex items-center gap-2 z-10">
+                <div className="w-2 h-2 bg-coral rounded-full animate-pulse" />
+                <span className="text-white text-xs font-semibold">Lesson {currentLesson} of 5</span>
+              </div> */}
             </div>
           </div>
 
-          {/* Lesson Description */}
-          <div className="p-4 bg-white border-b border-gray-100">
-            <p className="text-sm text-text-secondary leading-relaxed">
-              {showFullDescription
-                ? "Learn five natural phrases professionals use to talk about your work. By the end, you'll be able to introduce yourself confidently in meetings, interviews, or casual workplace conversations."
-                : "Learn five natural phrases professionals use to talk about your work..."}
-              <button
-                onClick={() => setShowFullDescription(!showFullDescription)}
-                className="text-navy font-semibold ml-1 hover:underline"
-              >
-                {showFullDescription ? "Read less" : "Read more"}
-              </button>
-            </p>
-          </div>
-
-          {/* Transcript Section */}
-          <div className="bg-white border-b border-gray-100">
+          {/* Skip & Next Button - Below Video (Right Side) */}
+          <div className="bg-white border-b border-gray-100 px-4 py-2 flex justify-end">
             <button
-              onClick={() => setShowTranscript(!showTranscript)}
-              className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+              onClick={() => {
+                if (videoRef.current) {
+                  videoRef.current.currentTime = videoRef.current.duration;
+                }
+              }}
+              className="bg-gray-100 hover:bg-gray-200 text-text-secondary px-3 py-1.5 rounded-[8px] flex items-center gap-1.5 transition-all text-xs font-medium"
             >
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-navy/10 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-navy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div className="text-left">
-                  <h3 className="font-semibold text-sm text-navy">Transcript</h3>
-                  <p className="text-xs text-text-secondary">Follow along with the video</p>
-                </div>
-              </div>
-              <ChevronRight className={`h-5 w-5 text-text-tertiary transition-transform ${
-                showTranscript ? 'rotate-90' : ''
-              }`} />
+              <span>Skip & Next</span>
+              <SkipForward className="h-3.5 w-3.5" />
             </button>
-
-            {showTranscript && (
-              <div className="px-4 pb-4 max-h-[400px] overflow-y-auto">
-                <div className="space-y-3">
-                  {transcriptData.map((item, index) => {
-                    const isActive = currentTime >= item.start && currentTime < item.end;
-                    return (
-                      <div
-                        key={index}
-                        onClick={() => handleTranscriptClick(item.start)}
-                        className={`p-3 rounded-[12px] cursor-pointer transition-all ${
-                          isActive
-                            ? 'bg-navy/10 border-2 border-navy shadow-sm'
-                            : 'bg-gray-50 border-2 border-transparent hover:border-gray-200 hover:shadow-sm'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className={`flex-shrink-0 w-12 h-8 rounded-[8px] flex items-center justify-center text-xs font-semibold ${
-                            isActive ? 'bg-navy text-white' : 'bg-white text-text-secondary'
-                          }`}>
-                            {formatTime(item.start)}
-                          </div>
-                          <p className={`text-sm leading-relaxed ${
-                            isActive ? 'text-navy font-medium' : 'text-text-primary'
-                          }`}>
-                            {item.text}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Tabs Section */}
+          {/* Transcript Section - Always Visible with Fixed Height */}
+          <div className="bg-white border-b mt-2 border-gray-100">
+            <div className="px-4 pb-4 h-[240px] overflow-y-auto">
+              <div className="space-y-3">
+                {transcriptData.map((item, index) => {
+                  const isActive = currentTime >= item.start && currentTime < item.end;
+                  return (
+                    <div
+                      key={index}
+                      onClick={() => handleTranscriptClick(item.start)}
+                      className={`p-3 rounded-[12px] cursor-pointer transition-all ${
+                        isActive
+                          ? 'bg-navy/10 border-2 border-navy shadow-sm'
+                          : 'bg-gray-50 border-2 border-transparent hover:border-gray-200 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`flex-shrink-0 w-12 h-8 rounded-[8px] flex items-center justify-center text-xs font-semibold ${
+                          isActive ? 'bg-navy text-white' : 'bg-white text-text-secondary'
+                        }`}>
+                          {formatTime(item.start)}
+                        </div>
+                        <p className={`text-sm leading-relaxed ${
+                          isActive ? 'text-navy font-medium' : 'text-text-primary'
+                        }`}>
+                          {item.text}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Practice Zone Section */}
           <div className="px-4 pt-4 bg-white">
-            {/* Simple Tab Navigation */}
+            
+            {/* Tab Navigation */}
             <div className="flex border-b border-gray-200 mb-5">
-              <button
+               <button
                 onClick={() => setActiveTab("practice")}
                 className={`flex-1 pb-3 text-sm font-semibold transition-all ${
                   activeTab === "practice"
@@ -574,7 +614,7 @@ export default function LessonPage() {
                     : "text-text-secondary"
                 }`}
               >
-                Practice
+                🔊 Practice
               </button>
               <button
                 onClick={() => setActiveTab("quiz")}
@@ -584,7 +624,7 @@ export default function LessonPage() {
                     : "text-text-secondary"
                 }`}
               >
-                Quiz
+                📝 Quiz
               </button>
               <button
                 onClick={() => setActiveTab("roleplay")}
@@ -594,121 +634,10 @@ export default function LessonPage() {
                     : "text-text-secondary"
                 }`}
               >
-                Role Play
+                🎭 Role Play
               </button>
+             
             </div>
-
-            {/* Practice Tab */}
-            {activeTab === "practice" && (
-              <Card className="border-gray-200 shadow-sm rounded-[20px]">
-                <CardContent className="p-6">
-                  {recordingState === 'feedback' && feedback ? (
-                    // Feedback UI
-                    <div className="animate-fade-in-up">
-                      <div className="flex items-center gap-4 mb-6">
-                        <div className="text-5xl font-bold text-teal">{feedback.overallScore}</div>
-                        <div>
-                          <p className="font-semibold text-text-primary">Overall Score</p>
-                          <p className="text-text-secondary text-sm">{feedback.generalFeedback}</p>
-                        </div>
-                      </div>
-
-                      {transcript && (
-                        <div className="mb-4 p-4 bg-gray-50 rounded-[12px]">
-                          <h4 className="font-semibold text-text-primary mb-2 text-sm">You said:</h4>
-                          <p className="text-base text-text-secondary italic">"{transcript}"</p>
-                        </div>
-                      )}
-                      
-                      <div className="mb-6 p-4 bg-gray-50 rounded-[12px]">
-                        <h4 className="font-semibold text-text-primary mb-3 text-sm">Word Analysis</h4>
-                        <div className="flex flex-wrap gap-2 text-base font-medium">
-                          {feedback.wordScores.map((ws, i) => (
-                            <span
-                              key={i}
-                              className={`px-3 py-1.5 rounded-[8px] ${
-                                ws.isCorrect
-                                  ? 'text-teal bg-teal/10'
-                                  : 'text-coral bg-coral/10'
-                              }`}
-                            >
-                              {ws.word}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={handleTryAgain}
-                          variant="outline"
-                          className="flex-1 h-11 rounded-[12px] font-semibold border-2 border-navy text-navy hover:bg-navy/5"
-                        >
-                          <RefreshCw className="h-4 w-4 mr-2" /> Try Again
-                        </Button>
-                        {currentPhraseIndex < unitLessons.length - 1 && (
-                          <Button
-                            onClick={handleNextPhrase}
-                            className="flex-1 bg-navy hover:bg-navy-hover text-white h-11 rounded-[12px] font-semibold"
-                          >
-                            Next Phrase <ChevronRight className="h-4 w-4 ml-2" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    // Recording UI
-                    <div className="min-h-[280px] flex flex-col items-center justify-center text-center">
-                      <div className="mb-4">
-                        <Badge className="bg-navy/10 text-navy border-0 mb-3">
-                          Phrase {currentPhraseIndex + 1} of {unitLessons.length}
-                        </Badge>
-                      </div>
-                      <p className="text-lg font-semibold text-text-primary mb-5 leading-relaxed px-4">
-                        "{unitLessons[currentPhraseIndex].phrase}"
-                      </p>
-                      
-                      <button
-                        onClick={playPhrase}
-                        className="mb-6 bg-teal/10 text-teal py-2 px-4 rounded-full font-semibold text-sm flex items-center gap-2 hover:bg-teal/20 transition-colors"
-                      >
-                        <Volume2 className="h-4 w-4" /> Listen to phrase
-                      </button>
-
-                      {recordingState === 'recording' ? (
-                        <Button
-                          size="icon"
-                          onClick={handleStopRecording}
-                          className="h-16 w-16 rounded-full mb-4 bg-coral hover:bg-coral-hover animate-pulse shadow-lg shadow-coral/30"
-                        >
-                          <Square className="h-7 w-7 text-white" />
-                        </Button>
-                      ) : recordingState === 'processing' ? (
-                        <div className="h-16 w-16 rounded-full mb-4 bg-navy/20 flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-navy"></div>
-                        </div>
-                      ) : (
-                        <Button
-                          size="icon"
-                          onClick={handleStartRecording}
-                          className="h-16 w-16 rounded-full mb-4 bg-navy hover:bg-navy-hover shadow-md shadow-navy/20 transition-transform hover:scale-105"
-                        >
-                          <Mic className="h-7 w-7 text-white" />
-                        </Button>
-                      )}
-                      
-                      <p className="text-sm text-text-secondary">
-                        {recordingState === 'recording' 
-                          ? 'Listening... Speak now!' 
-                          : recordingState === 'processing'
-                          ? 'Processing...'
-                          : 'Tap the microphone and speak the phrase'}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
 
             {/* Quiz Tab */}
             {activeTab === "quiz" && (
@@ -781,6 +710,123 @@ export default function LessonPage() {
                       </div>
                     </>
                   )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Practice Tab */}
+            {activeTab === "practice" && (
+              <Card className="border-gray-200 shadow-sm rounded-[20px]">
+                <CardContent className="p-6 min-h-[280px] flex flex-col items-center justify-between">
+                  
+                  <div className="w-full bg-gray-50 rounded-xl p-4 mb-4 border border-gray-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-text-secondary">Phrase to practice</span>
+                      <button 
+                        onClick={playPhrase}
+                        className="p-1.5 rounded-full bg-white shadow-sm hover:bg-gray-100 transition-colors"
+                        aria-label="Play phrase"
+                      >
+                        <Volume2 className="h-4 w-4 text-navy" />
+                      </button>
+                    </div>
+                    <p className="text-text-primary font-medium">
+                      {unitLessons[currentPhraseIndex]?.phrase.replace(/_+/g, ' ').trim()}
+                    </p>
+                  </div>
+
+                  {feedback ? (
+                    <div className="w-full bg-white rounded-xl p-4 border border-gray-100 mb-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-medium text-text-secondary">Your pronunciation</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-semibold ${
+                            feedback.overallScore >= 80 ? 'text-green-600' : 
+                            feedback.overallScore >= 50 ? 'text-amber-500' : 'text-red-500'
+                          }`}>
+                            {feedback.overallScore}%
+                          </span>
+                          <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${
+                                feedback.overallScore >= 80 ? 'bg-green-500' : 
+                                feedback.overallScore >= 50 ? 'bg-amber-400' : 'bg-red-400'
+                              }`}
+                              style={{ width: `${feedback.overallScore}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {feedback.wordScores.map((wordScore, i) => (
+                          <span 
+                            key={i} 
+                            className={`px-2 py-1 text-sm rounded-md ${
+                              wordScore.isCorrect 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800 line-through'
+                            }`}>
+                            {wordScore.word}
+                          </span>
+                        ))}
+                      </div>
+                      
+                      <p className="text-xs text-text-secondary">
+                        {feedback.generalFeedback}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="w-full bg-gray-50 rounded-xl p-4 mb-4 border border-gray-100">
+                      <p className="text-sm text-center text-text-secondary mb-3">
+                        {transcript || "Your recording will appear here..."}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 w-full">
+                    {recordingState === 'recording' ? (
+                      <Button 
+                        onClick={handleStopRecording}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white h-12 rounded-xl font-semibold flex items-center justify-center gap-2"
+                      >
+                        <Square className="h-4 w-4" />
+                        Stop Recording
+                      </Button>
+                    ) : (
+                      <Button 
+                        onClick={handleStartRecording}
+                        disabled={recordingState === 'processing'}
+                        className={`flex-1 ${
+                          recordingState === 'processing' 
+                            ? 'bg-navy/70' 
+                            : 'bg-navy hover:bg-navy-hover'
+                        } text-white h-12 rounded-xl font-semibold flex items-center justify-center gap-2`}
+                      >
+                        {recordingState === 'processing' ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <Mic className="h-4 w-4" />
+                            {feedback ? 'Try Again' : 'Start Speaking'}
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    
+                    {feedback && (
+                      <Button 
+                        onClick={handleNextPhrase}
+                        variant="outline"
+                        className="h-12 rounded-xl font-medium border-gray-300 hover:bg-gray-50"
+                      >
+                        Next Phrase
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             )}
