@@ -83,7 +83,7 @@ export default function Home() {
       category: "Business",
       level: "B2",
       image: "/imgs/Meeting a new calleague.png",
-      quoteParts: ["I work at ", ", where I handle ", "."],
+      quoteParts: ["I work, ", "microsoft where I", "", "."],
       fillIns: 2,
       learners: "5.8K",
       progress: 33,
@@ -189,8 +189,14 @@ export default function Home() {
 
       {/* Today's Lesson Card */}
       <Card
-        className="mb-6 overflow-hidden animate-fade-in-up border-gray-200 rounded-[24px] shadow-md"
+        className="mb-6 overflow-hidden animate-fade-in-up border-gray-200 rounded-[24px] shadow-md hover:shadow-lg transition-shadow cursor-pointer"
         style={{ animationDelay: "150ms" }}
+        onClick={(e: React.MouseEvent<HTMLElement>) => {
+          // Only navigate if the click wasn't on a button or its children
+          if (!(e.target instanceof HTMLButtonElement) && !(e.target as HTMLElement).closest('button')) {
+            router.push("/lesson");
+          }
+        }}
       >
         <CardContent className="p-5 pb-6">
           {/* Header Section */}
@@ -263,7 +269,10 @@ export default function Home() {
           {/* Buttons */}
           <div className="flex items-stretch gap-2.5">
             <Button 
-              onClick={() => router.push("/lesson")}
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push("/lesson");
+              }}
               className="flex-grow bg-coral text-white hover:bg-coral-hover active:bg-coral-active h-12 rounded-[16px] font-semibold shadow-sm"
             >
               {currentLesson.progress > 0
@@ -273,7 +282,10 @@ export default function Home() {
             <Button
               variant="outline"
               size="icon"
-              onClick={handleSwapLesson}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSwapLesson();
+              }}
               className="h-12 w-12 bg-gray-50 hover:bg-gray-100 border-gray-200 rounded-[16px]"
               aria-label="Swap lesson"
             >

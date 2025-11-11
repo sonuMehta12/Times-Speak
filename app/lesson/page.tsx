@@ -551,53 +551,79 @@ export default function LessonPage() {
             </div>
           </div>
 
-          {/* Skip & Next Button - Below Video (Right Side) */}
-          <div className="bg-white border-b border-gray-100 px-4 py-2 flex justify-end">
-            <button
-              onClick={() => {
-                if (videoRef.current) {
-                  videoRef.current.currentTime = videoRef.current.duration;
-                }
-              }}
-              className="bg-gray-100 hover:bg-gray-200 text-text-secondary px-3 py-1.5 rounded-[8px] flex items-center gap-1.5 transition-all text-xs font-medium"
-            >
-              <span>Skip & Next</span>
-              <SkipForward className="h-3.5 w-3.5" />
-            </button>
+          {/* Video Progress Bar */}
+          <div className="bg-white border-b border-gray-100 px-4 py-2">
+            <div className="flex items-center gap-2 w-full">
+              {/* Current Time */}
+              <span className="text-xs text-text-secondary w-10 text-right">
+                {formatTime(currentTime)}
+              </span>
+              
+              {/* Progress Bar */}
+              <div 
+                className="flex-1 h-1.5 bg-gray-200 rounded-full cursor-pointer relative group"
+                onClick={(e) => {
+                  if (!videoRef.current) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const pos = (e.clientX - rect.left) / rect.width;
+                  videoRef.current.currentTime = pos * (videoRef.current.duration || 0);
+                }}
+              >
+                <div 
+                  className="absolute left-0 top-0 h-full bg-navy/80 rounded-full group-hover:bg-navy transition-all duration-200"
+                  style={{
+                    width: videoRef.current && videoRef.current.duration 
+                      ? `${(currentTime / videoRef.current.duration) * 100}%` 
+                      : '0%'
+                  }}
+                >
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-md transition-opacity" />
+                </div>
+              </div>
+              
+              {/* Duration */}
+              <span className="text-xs text-text-secondary w-10">
+                {videoRef.current ? formatTime(videoRef.current.duration || 0) : '0:00'}
+              </span>
+              
+              {/* Skip & Next Button */}
+              <button
+                onClick={() => {
+                  if (videoRef.current) {
+                    videoRef.current.currentTime = videoRef.current.duration;
+                  }
+                }}
+                className="ml-2 bg-gray-100 hover:bg-gray-200 text-text-secondary px-3 py-1.5 rounded-[8px] flex items-center gap-1.5 transition-all text-xs font-medium"
+              >
+                <span>Skip & Next</span>
+                <SkipForward className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
 
-          {/* Transcript Section - Always Visible with Fixed Height */}
-          <div className="bg-white border-b mt-2 border-gray-100">
-            <div className="px-4 pb-4 h-[240px] overflow-y-auto">
-              <div className="space-y-3">
-                {transcriptData.map((item, index) => {
-                  const isActive = currentTime >= item.start && currentTime < item.end;
-                  return (
-                    <div
-                      key={index}
-                      onClick={() => handleTranscriptClick(item.start)}
-                      className={`p-3 rounded-[12px] cursor-pointer transition-all ${
-                        isActive
-                          ? 'bg-navy/10 border-2 border-navy shadow-sm'
-                          : 'bg-gray-50 border-2 border-transparent hover:border-gray-200 hover:shadow-sm'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`flex-shrink-0 w-12 h-8 rounded-[8px] flex items-center justify-center text-xs font-semibold ${
-                          isActive ? 'bg-navy text-white' : 'bg-white text-text-secondary'
-                        }`}>
-                          {formatTime(item.start)}
-                        </div>
-                        <p className={`text-sm leading-relaxed ${
-                          isActive ? 'text-navy font-medium' : 'text-text-primary'
-                        }`}>
-                          {item.text}
-                        </p>
-                      </div>
+          {/* Transcript Section - Single Active CC Style */}
+          <div className="bg-white border-b border-gray-100 px-4 py-3">
+            <div className="bg-gray-50 rounded-xl p-4 min-h-[80px] flex items-center justify-center">
+              {(() => {
+                const activeTranscript = transcriptData.find(
+                  item => currentTime >= item.start && currentTime < item.end
+                );
+                
+                return activeTranscript ? (
+                  <div className="text-center w-full">
+                    <p className="text-lg text-navy font-medium leading-relaxed">
+                      {activeTranscript.text}
+                    </p>
+                    <div className="mt-2 text-xs text-text-secondary">
+                      {formatTime(activeTranscript.start)} - {formatTime(activeTranscript.end)}
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                ) : (
+                  <p className="text-text-secondary text-center w-full">
+                    No active transcript for current time
+                  </p>
+                );
+              })()}
             </div>
           </div>
 

@@ -45,7 +45,7 @@ export default function Navbar() {
         {/* Logo */}
         <div className="flex items-center">
           <h1 className="font-display text-xl font-bold text-navy">
-            TimeSpeak
+            TimesSpeak
           </h1>
         </div>
 

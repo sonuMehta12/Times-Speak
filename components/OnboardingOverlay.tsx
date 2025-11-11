@@ -161,19 +161,50 @@ export default function OnboardingOverlay({ onComplete }: OnboardingOverlayProps
                 Continue with SSO
               </Button>
               
-              <Button
+              {/* <Button
                 variant="ghost"
                 onClick={handleSkip}
                 className="w-full text-text-secondary hover:text-navy rounded-[16px] font-semibold"
               >
                 Skip for Now
-              </Button>
+              </Button> */}
             </div>
           </div>
         );
-
-      // Step 2: Name
+ // Step 2: Learn from Language
       case 2:
+        const languages = [
+          { code: 'hi', name: 'हिन्दी (Hindi)', flag: '🇮🇳' },
+          { code: 'en', name: 'English', flag: '🇬🇧' },
+          { code: 'hing', name: 'Hinglish', flag: '🇮🇳🇬🇧' }
+        ];
+        
+        return (
+          <div className="space-y-6">
+            <AIPrompt>
+Which language do you want to learn English from?
+            </AIPrompt>
+            
+            <div className="space-y-3">
+              {languages.map(lang => (
+                <Button
+                  key={lang.code}
+                  onClick={() => {
+                    setSelectedLanguage(lang.code);
+                    handleNext();
+                  }}
+                  variant="outline"
+                  className="w-full p-5 h-auto border-2 border-gray-200 rounded-[20px] hover:border-teal hover:bg-teal/5 transition-all justify-start gap-3"
+                >
+                  <span className="text-2xl">{lang.flag}</span>
+                  <span className="font-semibold text-text-primary font-body">{lang.name}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      // Step 3: Name
+      case 3:
         return (
           <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="space-y-6">
             <AIPrompt>
@@ -204,38 +235,7 @@ export default function OnboardingOverlay({ onComplete }: OnboardingOverlayProps
           </form>
         );
 
-      // Step 3: Learn from Language
-      case 3:
-        const languages = [
-          { code: 'hi', name: 'हिन्दी (Hindi)', flag: '🇮🇳' },
-          { code: 'en', name: 'English', flag: '🇬🇧' },
-          { code: 'hing', name: 'Hinglish', flag: '🇮🇳🇬🇧' }
-        ];
-        
-        return (
-          <div className="space-y-6">
-            <AIPrompt>
-              Great to meet you, {userName}! Which language would you like to learn from?
-            </AIPrompt>
-            
-            <div className="space-y-3">
-              {languages.map(lang => (
-                <Button
-                  key={lang.code}
-                  onClick={() => {
-                    setSelectedLanguage(lang.code);
-                    handleNext();
-                  }}
-                  variant="outline"
-                  className="w-full p-5 h-auto border-2 border-gray-200 rounded-[20px] hover:border-teal hover:bg-teal/5 transition-all justify-start gap-3"
-                >
-                  <span className="text-2xl">{lang.flag}</span>
-                  <span className="font-semibold text-text-primary font-body">{lang.name}</span>
-                </Button>
-              ))}
-            </div>
-          </div>
-        );
+     
 
       // Step 4: Goals
       case 4:
@@ -250,7 +250,7 @@ export default function OnboardingOverlay({ onComplete }: OnboardingOverlayProps
         return (
           <div className="space-y-6">
             <AIPrompt>
-              What's your main goal for learning English, {userName}? You can select multiple.
+              What's your main goal for learning English Speaking, {userName}? You can select multiple.
             </AIPrompt>
             
             <div className="space-y-3">
@@ -349,9 +349,41 @@ export default function OnboardingOverlay({ onComplete }: OnboardingOverlayProps
             </Button>
           </div>
         );
-
-      // Step 7: Pain Points
+// Step 7: English Level
       case 7:
+        const levels = [
+          { id: 'beginner', name: 'Beginner (A1-A2)', desc: 'I know basic words and simple sentences' },
+          { id: 'intermediate', name: 'Intermediate (B1-B2)', desc: 'I can have conversations but struggle sometimes' },
+          { id: 'advanced', name: 'Advanced (C1-C2)', desc: 'I speak well but want to sound more natural' },
+          { id: 'native', name: 'Near-Native', desc: 'I speak fluently, just need minor improvements' }
+        ];
+        
+        return (
+          <div className="space-y-6">
+            <AIPrompt>
+              Almost there! What's your current English level, {userName}?
+            </AIPrompt>
+            
+            <div className="space-y-3">
+              {levels.map(level => (
+                <Button
+                  key={level.id}
+                  onClick={() => {
+                    setSelectedLevel(level.id);
+                    handleNext();
+                  }}
+                  variant="outline"
+                  className="w-full p-4 h-auto border-2 border-gray-200 rounded-[20px] hover:border-navy hover:bg-navy/5 transition-all flex-col items-start"
+                >
+                  <span className="font-bold text-navy font-body mb-1">{level.name}</span>
+                  <span className="text-xs text-text-secondary font-body">{level.desc}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      // Step 7: Pain Points
+      case 8:
         const painPoints = [
           'Fear of being judged',
           'Run out of vocabulary',
@@ -368,8 +400,7 @@ export default function OnboardingOverlay({ onComplete }: OnboardingOverlayProps
         return (
           <div className="space-y-6">
             <AIPrompt>
-              I understand. To help you best, {userName}, what stops you from speaking confidently? Select all that apply.
-            </AIPrompt>
+Thanks, {userName}! 😊 Tell me — what makes speaking feel hard for you? You can pick more than one.            </AIPrompt>
             
             <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
               {painPoints.map(point => {
@@ -406,7 +437,7 @@ export default function OnboardingOverlay({ onComplete }: OnboardingOverlayProps
         );
 
       // Step 8: Empathy Message
-      case 8:
+      case 9:
         return (
           <div className="space-y-6">
             <AIPrompt>
@@ -434,39 +465,7 @@ export default function OnboardingOverlay({ onComplete }: OnboardingOverlayProps
           </div>
         );
 
-      // Step 9: English Level
-      case 9:
-        const levels = [
-          { id: 'beginner', name: 'Beginner (A1-A2)', desc: 'I know basic words and simple sentences' },
-          { id: 'intermediate', name: 'Intermediate (B1-B2)', desc: 'I can have conversations but struggle sometimes' },
-          { id: 'advanced', name: 'Advanced (C1-C2)', desc: 'I speak well but want to sound more natural' },
-          { id: 'native', name: 'Near-Native', desc: 'I speak fluently, just need minor improvements' }
-        ];
-        
-        return (
-          <div className="space-y-6">
-            <AIPrompt>
-              Almost there! What's your current English level, {userName}?
-            </AIPrompt>
-            
-            <div className="space-y-3">
-              {levels.map(level => (
-                <Button
-                  key={level.id}
-                  onClick={() => {
-                    setSelectedLevel(level.id);
-                    handleNext();
-                  }}
-                  variant="outline"
-                  className="w-full p-4 h-auto border-2 border-gray-200 rounded-[20px] hover:border-navy hover:bg-navy/5 transition-all flex-col items-start"
-                >
-                  <span className="font-bold text-navy font-body mb-1">{level.name}</span>
-                  <span className="text-xs text-text-secondary font-body">{level.desc}</span>
-                </Button>
-              ))}
-            </div>
-          </div>
-        );
+      
 
       // Step 10: Final CTA
       case 10:

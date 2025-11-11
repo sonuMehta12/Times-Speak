@@ -225,45 +225,59 @@ export default function RolePlayConversationPage() {
   }, [displayedMessages]);
 
   // Text-to-speech function for individual messages
-  const speakMessage = (text: string, sender: MessageSender) => {
-    if (!('speechSynthesis' in window)) {
-      alert("Your browser does not support text-to-speech.");
-      return;
-    }
+  const speakMessage = (text: string, sender: MessageSender): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!('speechSynthesis' in window)) {
+        alert("Your browser does not support text-to-speech.");
+        resolve();
+        return;
+      }
 
-    // Stop any ongoing speech
-    window.speechSynthesis.cancel();
+      // Stop any ongoing speech
+      window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    utterance.rate = 0.9;
-    
-    // Use different voices for AI (female) and user (male)
-    const voices = window.speechSynthesis.getVoices();
-    if (sender === 'ai') {
-      // Try to find a female voice
-      const femaleVoice = voices.find(voice => 
-        voice.name.includes('Female') || 
-        voice.name.includes('female') ||
-        voice.name.includes('Samantha') ||
-        voice.name.includes('Victoria') ||
-        voice.name.includes('Zira')
-      );
-      if (femaleVoice) utterance.voice = femaleVoice;
-      utterance.pitch = 1.1;
-    } else {
-      // Try to find a male voice
-      const maleVoice = voices.find(voice => 
-        voice.name.includes('Male') || 
-        voice.name.includes('male') ||
-        voice.name.includes('David') ||
-        voice.name.includes('Mark')
-      );
-      if (maleVoice) utterance.voice = maleVoice;
-      utterance.pitch = 0.9;
-    }
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.9;
+      
+      // Use different voices for AI (female) and user (male)
+      const voices = window.speechSynthesis.getVoices();
+      if (sender === 'ai') {
+        // Try to find a female voice
+        const femaleVoice = voices.find(voice => 
+          voice.name.includes('Female') || 
+          voice.name.includes('female') ||
+          voice.name.includes('Samantha') ||
+          voice.name.includes('Victoria') ||
+          voice.name.includes('Zira')
+        );
+        if (femaleVoice) utterance.voice = femaleVoice;
+        utterance.pitch = 1.1;
+      } else {
+        // Try to find a male voice
+        const maleVoice = voices.find(voice => 
+          voice.name.includes('Male') || 
+          voice.name.includes('male') ||
+          voice.name.includes('David') ||
+          voice.name.includes('Mark')
+        );
+        if (maleVoice) utterance.voice = maleVoice;
+        utterance.pitch = 0.9;
+      }
 
-    window.speechSynthesis.speak(utterance);
+      // Add event listener for when speech ends
+      utterance.onend = () => {
+        resolve();
+      };
+
+      // Add error handler
+      utterance.onerror = (event) => {
+        console.error('SpeechSynthesis error:', event);
+        resolve(); // Resolve anyway to prevent getting stuck
+      };
+
+      window.speechSynthesis.speak(utterance);
+    });
   };
 
   // Toggle translation visibility
@@ -376,7 +390,10 @@ export default function RolePlayConversationPage() {
 
     // Load voices first
     if ('speechSynthesis' in window) {
+      // Force voice loading
       window.speechSynthesis.getVoices();
+      // Some browsers need a small delay for voices to load
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     for (let i = 0; i < conversationScript.length; i++) {
@@ -391,11 +408,16 @@ export default function RolePlayConversationPage() {
       setDisplayedMessages((prev) => [...prev, messageWithUserName]);
       setActiveMessageId(message.id);
 
-      // Auto-play the message with appropriate voice
-      speakMessage(messageWithUserName.text, message.sender);
-
-      const readTime = message.text.length * 40 + 500;
-      await new Promise((resolve) => setTimeout(resolve, readTime));
+      try {
+        // Wait for the message to finish speaking before continuing
+        await speakMessage(messageWithUserName.text, message.sender);
+        
+        // Add a small delay between messages for better user experience
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error('Error in text-to-speech:', error);
+        // Continue to next message even if one fails
+      }
     }
 
     setActiveMessageId(null);
