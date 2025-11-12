@@ -589,9 +589,7 @@ export default function LessonPage() {
               {/* Skip & Next Button */}
               <button
                 onClick={() => {
-                  if (videoRef.current) {
-                    videoRef.current.currentTime = videoRef.current.duration;
-                  }
+                  router.push('/quiz');
                 }}
                 className="ml-2 bg-gray-100 hover:bg-gray-200 text-text-secondary px-3 py-1.5 rounded-[8px] flex items-center gap-1.5 transition-all text-xs font-medium"
               >

@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
+import "react-circular-progressbar/dist/styles.css";
 import {
   Clock,
   Sparkles,
@@ -10,6 +12,7 @@ import {
   MessageCircle,
   Play,
   Users,
+Drama,
   Flame,
   Globe,
 } from "lucide-react";
@@ -57,6 +60,15 @@ export default function Home() {
       path: "/aditi",
     },
     {
+      id: "explore",
+      icon: Drama,
+      title: "Role Play",
+      color: "text-teal",
+      bgColor: "bg-teal/10",
+      hoverBg: "hover:bg-teal/20",
+      path: "/role",
+    },
+    {
       id: "learn",
       icon: BookOpen,
       title: "Learn Path",
@@ -64,16 +76,7 @@ export default function Home() {
       bgColor: "bg-navy/10",
       hoverBg: "hover:bg-navy/20",
       path: "/learn",
-    },
-    {
-      id: "explore",
-      icon: Play,
-      title: "Role Play",
-      color: "text-teal",
-      bgColor: "bg-teal/10",
-      hoverBg: "hover:bg-teal/20",
-      path: "/role",
-    },
+    } 
   ];
 
   const todaysLessons = [
@@ -200,17 +203,34 @@ export default function Home() {
       >
         <CardContent className="p-5 pb-6">
           {/* Header Section */}
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
-              Today&apos;s Lesson
-            </span>
-            <div className="flex gap-2">
-              <Badge className="bg-teal/10 text-teal hover:bg-teal/10 border-0 rounded-xl">
-                {currentLesson.category}
-              </Badge>
-              <Badge className="bg-navy/10 text-navy hover:bg-navy/10 border-0 rounded-xl">
-                {currentLesson.level}
-              </Badge>
+          <div className="flex items-start justify-between mb-3 relative">
+            <div>
+              <span className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
+                Today&apos;s Lesson
+              </span>
+              <div className="flex gap-2 mt-1">
+                <Badge className="bg-teal/10 text-teal hover:bg-teal/10 border-0 rounded-xl">
+                  {currentLesson.category}
+                </Badge>
+                <Badge className="bg-navy/10 text-navy hover:bg-navy/10 border-0 rounded-xl">
+                  {currentLesson.level}
+                </Badge>
+              </div>
+            </div>
+            
+            {/* Circular Progress Bar */}
+            <div className="w-12 h-12 -mt-2 -mr-2">
+              <CircularProgressbar
+                value={currentLesson.progress || 0}
+                text={`${currentLesson.progress || 0}%`}
+                strokeWidth={10}
+                styles={buildStyles({
+                  pathColor: "#4F46E5", // navy color
+                  textColor: "#1F2937", // text-primary
+                  trailColor: "#E5E7EB", // bg-gray-200
+                  textSize: '32px',
+                })}
+              />
             </div>
           </div>
 
@@ -276,7 +296,7 @@ export default function Home() {
               className="flex-grow bg-coral text-white hover:bg-coral-hover active:bg-coral-active h-12 rounded-[16px] font-semibold shadow-sm"
             >
               {currentLesson.progress > 0
-                ? "Continue Learning"
+                ? "Start Learning"
                 : "Start Learning"}
             </Button>
             <Button
@@ -300,9 +320,9 @@ export default function Home() {
         className="mb-6 animate-fade-in-up"
         style={{ animationDelay: "300ms" }}
       >
-        <h2 className="text-lg font-bold text-navy mb-4 font-display">
+        {/* <h2 className="text-lg font-bold text-navy mb-4 font-display">
           Quick Practice
-        </h2>
+        </h2> */}
         <div className="grid grid-cols-3 gap-3">
           {quickCategories.map((cat) => (
             <Button
@@ -329,9 +349,9 @@ export default function Home() {
         className="animate-fade-in-up"
         style={{ animationDelay: "450ms" }}
       >
-        <h2 className="text-lg font-bold text-navy mb-4 font-display">
+        {/* <h2 className="text-lg font-bold text-navy mb-4 font-display">
           Learning Feed
-        </h2>
+        </h2> */}
 
         {/* Filter Section */}
         <Card className="p-4 mb-4 border-gray-200 rounded-[20px] shadow-sm">
@@ -406,11 +426,6 @@ export default function Home() {
                     fill
                     className="object-cover"
                   />
-                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="w-14 h-14 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center">
-                      <Play className="w-7 h-7 text-white" />
-                    </div>
-                  </div>
                 </div>
                 <div className="text-center mb-4">
                   <p className="font-body text-base text-text-primary italic mb-2">
@@ -424,8 +439,8 @@ export default function Home() {
                     .
                   </p>
                 </div>
-                <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                {/* <div className="pt-4 border-t border-gray-100 flex items-center justify-between"> */}
+                  {/* <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10 border-2 border-gray-100">
                       <AvatarImage
                         src={card.tutor.avatar}
@@ -443,15 +458,15 @@ export default function Home() {
                         {card.tutor.role}
                       </p>
                     </div>
-                  </div>
-                  <Badge
+                  </div> */}
+                  {/* <Badge
                     variant="outline"
                     className="flex items-center gap-1.5 border-gray-200 rounded-[12px]"
                   >
                     <Users className="w-4 h-4" />
                     <span>{card.learners}</span>
-                  </Badge>
-                </div>
+                  </Badge> */}
+                {/* </div> */}
               </CardContent>
             </Card>
           ))}
