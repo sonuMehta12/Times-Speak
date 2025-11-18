@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(del \"c:\\Users\\sonu1\\OneDrive - HR sevice PVT LTD\\Documents\\Desktop\\project\\lib\\data\\events.ts\")",
+      "Bash(del \"c:\\Users\\sonu1\\OneDrive - HR sevice PVT LTD\\Documents\\Desktop\\project\\lib\\data\\categories.ts\")",
+      "Bash(del \"c:\\Users\\sonu1\\OneDrive - HR sevice PVT LTD\\Documents\\Desktop\\project\\lib\\types\\event.ts\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

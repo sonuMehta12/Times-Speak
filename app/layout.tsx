@@ -3,6 +3,7 @@ import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import ConditionalLayout from "@/components/ConditionalLayout";
 import OnboardingWrapper from "@/components/OnboardingWrapper";
+import { LessonProvider } from "@/lib/context/LessonContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -35,11 +36,13 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} ${playfair.variable} antialiased`}>
-        <OnboardingWrapper>
-          <div className="mobile-app">
-            <ConditionalLayout>{children}</ConditionalLayout>
-          </div>
-        </OnboardingWrapper>
+        <LessonProvider>
+          <OnboardingWrapper>
+            <div className="mobile-app">
+              <ConditionalLayout>{children}</ConditionalLayout>
+            </div>
+          </OnboardingWrapper>
+        </LessonProvider>
       </body>
     </html>
   );

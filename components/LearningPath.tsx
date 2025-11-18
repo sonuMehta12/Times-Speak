@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { ArrowLeft, Check, Lock, Star, Play, Sparkles, Clock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Check, Lock, Star, Target, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useLessonContext } from '@/lib/context/LessonContext';
+import { UNITS_DATA } from '@/lib/data/units';
 
 enum LessonStatus {
   Completed = 'completed',
@@ -13,25 +15,19 @@ enum LessonStatus {
   Locked = 'locked'
 }
 
-interface Lesson {
-  id: number;
+interface Node {
+  id: string;
+  lessonId?: string;
+  unitId: string;
   title: string;
   phrase: string;
+  phraseMeaning?: string;
+  lessonNumber?: number;
   status: LessonStatus;
   xp: number;
   duration: string;
+  type: 'lesson' | 'final-quiz' | 'final-roleplay';
 }
-
-const initialLessons: Lesson[] = [
-  { id: 1, title: "Introducing Yourself", phrase: "Hi, I'm... Nice to meet you!", status: LessonStatus.Completed, xp: 50, duration: "5 min" },
-  { id: 2, title: "Talking About Hobbies", phrase: "I enjoy... In my free time...", status: LessonStatus.Completed, xp: 50, duration: "7 min" },
-  { id: 3, title: "Describing Your Day", phrase: "Today I... Yesterday I...", status: LessonStatus.Completed, xp: 50, duration: "6 min" },
-  { id: 4, title: "How to Talk About Work?", phrase: "I work at... I'm responsible for...", status: LessonStatus.Active, xp: 75, duration: "10 min" },
-  { id: 5, title: "Making Plans", phrase: "Would you like to... How about...", status: LessonStatus.Locked, xp: 75, duration: "8 min" },
-  { id: 6, title: "Ordering Food", phrase: "I'd like to order... Could I have...", status: LessonStatus.Locked, xp: 75, duration: "9 min" },
-  { id: 7, title: "Asking for Directions", phrase: "Excuse me, how do I get to...", status: LessonStatus.Locked, xp: 100, duration: "12 min" },
-  { id: 8, title: "Shopping & Bargaining", phrase: "How much is this? Do you have...", status: LessonStatus.Locked, xp: 100, duration: "11 min" }
-];
 
 const NODE_V_SPACING = 100;
 const NODE_H_OFFSET = 25;
@@ -49,26 +45,26 @@ const getNodePosition = (index: number): { x: number; y: number } => {
 const getStatusColors = (status: LessonStatus) => {
   switch (status) {
     case LessonStatus.Completed:
-      return { 
-        node: 'bg-teal', 
-        text: 'text-white', 
-        border: 'border-teal', 
+      return {
+        node: 'bg-teal',
+        text: 'text-white',
+        border: 'border-teal',
         ring: 'ring-teal',
         shadow: 'shadow-teal/30'
       };
     case LessonStatus.Active:
-      return { 
-        node: 'bg-gold', 
-        text: 'text-navy', 
-        border: 'border-gold', 
+      return {
+        node: 'bg-gold',
+        text: 'text-navy',
+        border: 'border-gold',
         ring: 'ring-gold',
         shadow: 'shadow-gold/40'
       };
     case LessonStatus.Locked:
-      return { 
-        node: 'bg-gray-200', 
-        text: 'text-gray-400', 
-        border: 'border-gray-300', 
+      return {
+        node: 'bg-gray-200',
+        text: 'text-gray-400',
+        border: 'border-gray-300',
         ring: 'ring-gray-300',
         shadow: 'shadow-gray-200'
       };
@@ -76,47 +72,81 @@ const getStatusColors = (status: LessonStatus) => {
 };
 
 interface ActiveLessonCardProps {
-  lesson: Lesson;
+  node: Node;
   onStart: () => void;
   isLeft: boolean;
 }
 
-const ActiveLessonCard: React.FC<ActiveLessonCardProps> = ({ lesson, onStart, isLeft }) => {
-  const positionClasses = isLeft ? 'left-full ml-6' : 'right-full mr-6';
-  const arrowClasses = isLeft 
-    ? 'left-0 -translate-x-1/2 border-t border-l' 
-    : 'right-0 translate-x-1/2 border-b border-r';
+const ActiveLessonCard: React.FC<ActiveLessonCardProps> = ({ node, onStart, isLeft }) => {
+  const getButtonText = () => {
+    if (node.type === 'final-quiz') return 'Start Final Quiz';
+    if (node.type === 'final-roleplay') return 'Start Final Roleplay';
+    return 'Start the lesson';
+  };
+
+  // Fixed positioning: card appears in a fixed horizontal position
+  // For LEFT nodes: card goes to LEFT side of screen
+  // For RIGHT nodes: card goes to RIGHT side of screen
+  const horizontalPosition = isLeft
+    ? 'left-0 ml-2'  // Card on left edge
+    : 'right-0 mr-2'; // Card on right edge
+
+  // Notch connects card to node - positioned on the side CLOSEST to the node
+  // For LEFT nodes: notch on RIGHT side (toward the left node)
+  // For RIGHT nodes: notch on LEFT side (toward the right node)
+  const arrowHorizontalPosition = isLeft ? 'right-0 translate-x-1/2' : 'left-0 -translate-x-1/2';
+  const arrowRotation = isLeft ? '-rotate-45' : 'rotate-45';
+  const arrowBorders = isLeft ? 'border-b-2 border-r-2' : 'border-t-2 border-l-2';
+
+  // Format phrase to show fill-in-the-blank style
+  const formatPhraseWithBlanks = (phrase: string) => {
+    // Find the last word and replace with ___
+    const words = phrase.trim().split(' ');
+    if (words.length > 1) {
+      words[words.length - 1] = '___?';
+      return words.join(' ');
+    }
+    return phrase;
+  };
 
   return (
-    <div className={`absolute top-1/2 -translate-y-1/2 w-56 z-30 animate-fade-in-up ${positionClasses}`}>
-      <Card className="relative bg-white rounded-2xl shadow-xl border-2 border-gold">
-        <div className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white transform rotate-45 ${arrowClasses} border-gold`}></div>
+    <div className={`absolute top-[60px] ${horizontalPosition} w-[min(260px,calc(100vw-100px))] z-30 animate-fade-in`}>
+      <Card className="relative bg-white rounded-2xl shadow-2xl border-2 border-gold/30">
+        {/* Arrow/Notch pointing to the node - positioned on the side facing the node */}
+        <div className={`absolute ${arrowHorizontalPosition} top-2 w-3 h-3 bg-white transform ${arrowRotation} ${arrowBorders} border-gold/30 z-10`}></div>
+
         <CardContent className="p-4">
-          <div className="flex justify-between items-center mb-2">
-            <Badge className="bg-gold/20 text-gold border-0 px-2 py-0.5 rounded-full text-xs font-bold flex items-center gap-1">
-              <Sparkles className="h-2.5 w-2.5" />
-              +{lesson.xp} XP
+          {/* Header: Lesson tag + XP */}
+          <div className="flex items-center justify-between mb-3">
+            <Badge variant="outline" className="border-coral/30 bg-coral/10 text-coral rounded-md px-2 py-0.5 text-xs font-semibold">
+              {node.lessonNumber ? `Lesson ${node.lessonNumber}` : node.title}
             </Badge>
-            <Badge variant="outline" className="border-gray-200 rounded-full px-2 py-0.5 text-xs text-text-secondary flex items-center gap-1">
-              <Clock className="h-2.5 w-2.5" />
-              {lesson.duration}
+            <Badge className="bg-gold/20 text-gold border-0 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+              <Star className="h-3 w-3 fill-gold" />
+              +{node.xp} Exp
             </Badge>
           </div>
-          
-          <h3 className="text-base font-bold text-navy mb-2 font-display">
-            {lesson.title}
-          </h3>
-          
-          <div className="text-xs text-text-primary bg-navy/5 p-2 rounded-lg border-l-3 border-gold italic mb-3">
-            &quot;{lesson.phrase}&quot;
+
+          {/* Key Phrase in "fill-in-the-blank" style */}
+          <div className="bg-gradient-to-br from-navy/5 to-teal/5 p-3.5 rounded-xl mb-2.5 border border-navy/10">
+            <p className="text-lg font-bold text-navy text-center font-display leading-snug">
+              {formatPhraseWithBlanks(node.phrase)}
+            </p>
           </div>
-          
+
+          {/* Phrase Meaning */}
+          {node.phraseMeaning && (
+            <p className="text-xs text-text-secondary text-center mb-4 leading-relaxed">
+              {node.phraseMeaning}
+            </p>
+          )}
+
+          {/* Start Button */}
           <Button
             onClick={onStart}
-            className="w-full bg-coral hover:bg-coral-hover text-white font-semibold py-2 rounded-xl transition-all active:scale-95 shadow-lg shadow-coral/30 h-auto text-sm"
+            className="w-full bg-gradient-to-r from-coral to-coral-hover hover:from-coral-hover hover:to-coral-active text-white font-bold py-3 rounded-xl transition-all active:scale-95 shadow-lg shadow-coral/30 h-auto text-sm"
           >
-            <Play className="h-3.5 w-3.5 mr-1.5" />
-            Start Lesson
+            {getButtonText()}
           </Button>
         </CardContent>
       </Card>
@@ -125,19 +155,28 @@ const ActiveLessonCard: React.FC<ActiveLessonCardProps> = ({ lesson, onStart, is
 };
 
 interface LessonNodeProps {
-  lesson: Lesson;
-  index: number;
+  node: Node;
   isActive: boolean;
-  onClick: (id: number) => void;
+  onClick: (id: string) => void;
 }
 
-const LessonNode: React.FC<LessonNodeProps> = ({ lesson, index, isActive, onClick }) => {
-  const colors = getStatusColors(lesson.status);
-  const isClickable = lesson.status !== LessonStatus.Locked;
+const LessonNode: React.FC<LessonNodeProps> = ({ node, isActive, onClick }) => {
+  const colors = getStatusColors(node.status);
+  const isClickable = node.status !== LessonStatus.Locked;
+
+  const getNodeIcon = () => {
+    if (node.status === LessonStatus.Completed) return <Check className="h-6 w-6" strokeWidth={3} />;
+    if (node.status === LessonStatus.Active) {
+      if (node.type === 'final-quiz') return <Target className="h-6 w-6" fill="currentColor" />;
+      if (node.type === 'final-roleplay') return <Trophy className="h-6 w-6" fill="currentColor" />;
+      return <Star className="h-6 w-6" fill="currentColor" />;
+    }
+    return <Lock className="h-5 w-5" />;
+  };
 
   return (
     <button
-      onClick={() => isClickable && onClick(lesson.id)}
+      onClick={() => isClickable && onClick(node.id)}
       disabled={!isClickable}
       style={{ width: `${NODE_SIZE}px`, height: `${NODE_SIZE}px` }}
       className={`relative rounded-full flex items-center justify-center font-bold text-xl
@@ -146,9 +185,7 @@ const LessonNode: React.FC<LessonNodeProps> = ({ lesson, index, isActive, onClic
                   ${isClickable ? 'cursor-pointer hover:scale-110' : 'cursor-not-allowed opacity-60'}
                   ${isActive ? `ring-4 ring-offset-2 ring-offset-white ${colors.ring}` : ''}`}
     >
-      {lesson.status === LessonStatus.Completed && <Check className="h-6 w-6" strokeWidth={3} />}
-      {lesson.status === LessonStatus.Active && <Star className="h-6 w-6" fill="currentColor" />}
-      {lesson.status === LessonStatus.Locked && <Lock className="h-5 w-5" />}
+      {getNodeIcon()}
 
       {isActive && (
         <div className="absolute inset-0 rounded-full bg-gold/30 animate-pulse"></div>
@@ -157,34 +194,116 @@ const LessonNode: React.FC<LessonNodeProps> = ({ lesson, index, isActive, onClic
   );
 };
 
-export default function LearnPage() {
-  const userName = "John";
-  const [lessons] = useState<Lesson[]>(initialLessons);
-  const activeLesson = useMemo(() => lessons.find(l => l.status === LessonStatus.Active), [lessons]);
-  const [activeNodeId, setActiveNodeId] = useState<number | null>(activeLesson?.id ?? null);
+export default function LearningPath() {
+  const router = useRouter();
+  const {
+    userProgress,
+    isLessonUnlocked,
+    isFinalQuizUnlocked,
+    isFinalRoleplayUnlocked
+  } = useLessonContext();
 
-  const handleNodeClick = useCallback((id: number) => {
+  // Get current unit (Unit 1 for now)
+  const currentUnit = UNITS_DATA[0]; // unit_1_introduction
+  const unitId = currentUnit.unitId;
+
+  // Transform lessons from UNITS_DATA into nodes
+  const nodes: Node[] = useMemo(() => {
+    const lessonNodes: Node[] = currentUnit.lessons.map((lesson, index) => {
+      const progress = userProgress.units[unitId]?.lessonsProgress[lesson.id];
+
+      // Determine status
+      let status: LessonStatus;
+      if (progress?.completed) {
+        status = LessonStatus.Completed;
+      } else if (isLessonUnlocked(lesson.id, unitId)) {
+        status = LessonStatus.Active;
+      } else {
+        status = LessonStatus.Locked;
+      }
+
+      return {
+        id: `lesson-${lesson.id}`,
+        lessonId: lesson.id,
+        unitId,
+        title: lesson.title || `Lesson ${index + 1}`,
+        phrase: lesson.phrase,
+        phraseMeaning: lesson.phraseMeaning,
+        lessonNumber: index + 1,
+        status,
+        xp: progress?.xpEarned || 50,
+        duration: "5 min",
+        type: 'lesson' as const,
+      };
+    });
+
+    // Add final quiz node (Node 6)
+    const finalQuizUnlocked = isFinalQuizUnlocked(unitId);
+    const finalQuizCompleted = userProgress.units[unitId]?.finalQuizCompleted;
+
+    const finalQuizNode: Node = {
+      id: 'final-quiz',
+      unitId,
+      title: 'Final Quiz',
+      phrase: 'Test Your Knowledge',
+      status: finalQuizCompleted
+        ? LessonStatus.Completed
+        : finalQuizUnlocked
+          ? LessonStatus.Active
+          : LessonStatus.Locked,
+      xp: 100,
+      duration: '10 min',
+      type: 'final-quiz',
+    };
+
+    // Add final roleplay node (Node 7)
+    const finalRoleplayUnlocked = isFinalRoleplayUnlocked(unitId);
+    const finalRoleplayCompleted = userProgress.units[unitId]?.finalRoleplayCompleted;
+
+    const finalRoleplayNode: Node = {
+      id: 'final-roleplay',
+      unitId,
+      title: 'Final Roleplay',
+      phrase: 'Master Conversation',
+      status: finalRoleplayCompleted
+        ? LessonStatus.Completed
+        : finalRoleplayUnlocked
+          ? LessonStatus.Active
+          : LessonStatus.Locked,
+      xp: 150,
+      duration: '15 min',
+      type: 'final-roleplay',
+    };
+
+    return [...lessonNodes, finalQuizNode, finalRoleplayNode];
+  }, [currentUnit, unitId, userProgress, isLessonUnlocked, isFinalQuizUnlocked, isFinalRoleplayUnlocked]);
+
+  const activeNode = useMemo(() => nodes.find(n => n.status === LessonStatus.Active), [nodes]);
+  const [activeNodeId, setActiveNodeId] = useState<string | null>(activeNode?.id ?? null);
+
+  const handleNodeClick = useCallback((id: string) => {
     setActiveNodeId(id);
   }, []);
-  
-  const handleStartLesson = useCallback((id: number) => {
-    console.log('Starting lesson:', id);
-    window.location.href = '/lesson';
-  }, []);
 
-  const handleBack = () => {
-    window.history.back();
-  };
+  const handleStartNode = useCallback((node: Node) => {
+    if (node.type === 'final-quiz') {
+      router.push(`/${unitId}/final/quiz`);
+    } else if (node.type === 'final-roleplay') {
+      router.push(`/${unitId}/final/roleplay`);
+    } else if (node.lessonId) {
+      router.push(`/${unitId}/${node.lessonId}/lesson`);
+    }
+  }, [router, unitId]);
 
-  const pathHeight = (lessons.length - 1) * NODE_V_SPACING + NODE_SIZE + 100;
+  const pathHeight = (nodes.length - 1) * NODE_V_SPACING + NODE_SIZE + 100;
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Learning Path Container */} 
+      {/* Learning Path Container */}
       <div className="relative rounded-3xl p-6 overflow-hidden max-w-2xl mx-auto">
         {/* Decorative background gradient */}
         <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-navy/5 to-transparent pointer-events-none" />
-        
+
         <div className="relative mx-auto" style={{ width: `${PATH_WIDTH}px`, minHeight: `${pathHeight}px` }}>
           {/* SVG Path */}
           <svg
@@ -192,16 +311,16 @@ export default function LearnPage() {
             viewBox={`0 0 ${PATH_WIDTH} ${pathHeight}`}
             preserveAspectRatio="none"
           >
-            {lessons.slice(0, -1).map((lesson, index) => {
+            {nodes.slice(0, -1).map((node, index) => {
               const startPos = getNodePosition(index);
               const endPos = getNodePosition(index + 1);
-              const isPathCompleted = lesson.status === LessonStatus.Completed;
+              const isPathCompleted = node.status === LessonStatus.Completed;
 
               const startX = (startPos.x / 100) * PATH_WIDTH;
               const startY = startPos.y;
               const endX = (endPos.x / 100) * PATH_WIDTH;
               const endY = endPos.y;
-              
+
               const ctrlX1 = startX;
               const ctrlY1 = startY + NODE_V_SPACING * 0.5;
               const ctrlX2 = endX;
@@ -209,7 +328,7 @@ export default function LearnPage() {
 
               return (
                 <path
-                  key={`path-${lesson.id}`}
+                  key={`path-${node.id}`}
                   d={`M ${startX} ${startY} C ${ctrlX1} ${ctrlY1}, ${ctrlX2} ${ctrlY2}, ${endX} ${endY}`}
                   stroke={isPathCompleted ? '#06B6D4' : '#E5E7EB'}
                   strokeWidth="4"
@@ -223,14 +342,14 @@ export default function LearnPage() {
           </svg>
 
           {/* Lesson Nodes and Active Card */}
-          {lessons.map((lesson, index) => {
+          {nodes.map((node, index) => {
             const position = getNodePosition(index);
-            const isActive = activeNodeId === lesson.id && lesson.status !== LessonStatus.Locked;
+            const isActive = activeNodeId === node.id && node.status !== LessonStatus.Locked;
             const isLeft = index % 2 === 0;
 
             return (
               <div
-                key={lesson.id}
+                key={node.id}
                 className="absolute"
                 style={{
                   left: `${position.x}%`,
@@ -240,15 +359,14 @@ export default function LearnPage() {
                 }}
               >
                 <LessonNode
-                  lesson={lesson}
-                  index={index}
+                  node={node}
                   isActive={isActive}
                   onClick={handleNodeClick}
                 />
                 {isActive && (
                   <ActiveLessonCard
-                    lesson={lesson}
-                    onStart={() => handleStartLesson(lesson.id)}
+                    node={node}
+                    onStart={() => handleStartNode(node)}
                     isLeft={isLeft}
                   />
                 )}

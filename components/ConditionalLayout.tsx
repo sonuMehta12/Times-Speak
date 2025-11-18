@@ -22,7 +22,8 @@ const HIDE_BOTH_ROUTES = [
  * Example: Adding "/lesson" will hide navbar but show footer for "/lesson" and sub-routes.
  */
 const HIDE_NAVBAR_ONLY_ROUTES = [
-  "/lesson"
+  "/lesson",
+  "/lesson-complete"
   // Add more routes here as needed
 ];
 
@@ -33,15 +34,20 @@ export default function ConditionalLayout({
 }) {
   const pathname = usePathname();
 
+  // Check for dynamic routes like /unit_1_introduction/l1/quiz
+  const isDynamicQuizRoute = pathname.includes("/quiz");
+  const isDynamicRoleplayRoute = pathname.includes("/roleplay");
+  const isDynamicLessonRoute = pathname.includes("/lesson");
+
   // Check if current route should hide both navbar and footer
   const shouldHideBoth = HIDE_BOTH_ROUTES.some((route) =>
     pathname.startsWith(route)
-  );
+  ) || isDynamicQuizRoute || isDynamicRoleplayRoute;
 
   // Check if current route should hide only navbar
   const shouldHideNavbarOnly = HIDE_NAVBAR_ONLY_ROUTES.some((route) =>
     pathname.startsWith(route)
-  );
+  ) || isDynamicLessonRoute;
 
   // Determine what to show
   const showNavbar = !shouldHideBoth && !shouldHideNavbarOnly;
