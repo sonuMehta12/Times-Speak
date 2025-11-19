@@ -1,5 +1,6 @@
 // lib/data/units.ts
 import { Unit } from "@/lib/types/language";
+import { QuizQuestion } from "@/lib/types/quiz";
 
 export const UNITS_DATA: Unit[] = [
   {
@@ -12,7 +13,7 @@ export const UNITS_DATA: Unit[] = [
         phrase: "Hey! How's it going?",
         phraseMeaning: "A casual, friendly way to greet someone and ask how they are doing.",
         script:
-          "Let's learn a friendly way to greet people at work or with friends. Say: 'Hey! How's it going?' It's a simple, casual 'How are you?' Now try it — say: 'Hey! How's it going?'",
+          "Let's learn a friendly way to greet people at work or with friends. 'Hey! How's it going?' It's a simple, casual 'How are you?' Now try it — say: 'Hey! How's it going?'",
         phraseExplanations: [
           { phrase: "'Hey!'", explanation: "is a casual, friendly greeting used with friends and colleagues." },
           { phrase: "'How's it going?'", explanation: "is an informal way to ask 'How are you?' — common in everyday conversation." }
@@ -116,6 +117,95 @@ export const UNITS_DATA: Unit[] = [
         ],
       },
     ],
+    finalQuiz: {
+      id: "unit_1_final_quiz",
+      totalQuestions: 6,
+      questions: [
+        // Q1: Listening Comprehension - Casual Context (tests L1)
+        {
+          id: 1,
+          type: "listening",
+          question: "Listen carefully and choose the best response:",
+          audio: "Hey! How's it going?",
+          options: [
+            "I'm going to the market.",
+            "Good, thanks! How about you?",
+            "Nice to meet you.",
+          ],
+          correct: 1,
+          correctFeedback: "Perfect! 'Good, thanks! How about you?' is the natural response to a casual greeting.",
+          incorrectFeedback: "Remember: 'How's it going?' means 'How are you?' - it's asking about how you are, not where you're going!",
+        },
+        // Q2: Context Recognition (tests L1, L2, L4)
+        {
+          id: 2,
+          type: "context",
+          question: "Choose the most appropriate greeting for this situation:",
+          scenario: "You're meeting your new manager for the first time at the office.",
+          options: [
+            "Hey! What's up?",
+            "Good morning. Nice to meet you.",
+            "Yo! How's it going?",
+          ],
+          correct: 1,
+          correctFeedback: "Excellent! In a professional setting with someone senior, 'Good morning. Nice to meet you.' is the perfect choice.",
+          incorrectFeedback: "Think about formality: casual greetings like 'Hey' or 'Yo' aren't appropriate when meeting a manager for the first time.",
+        },
+        // Q3: Listening Comprehension - Professional Context (tests L4)
+        {
+          id: 3,
+          type: "listening",
+          question: "Listen and select the correct answer to the question:",
+          audio: "What do you do?",
+          options: [
+            "I'm from Mumbai.",
+            "I work in marketing.",
+            "My hobby is cricket.",
+          ],
+          correct: 1,
+          correctFeedback: "Great! 'What do you do?' is asking about your job or profession.",
+          incorrectFeedback: "'What do you do?' asks about your work or studies, not your location or hobbies.",
+        },
+        // Q4: Sentence Construction (tests L2, L3, L4)
+        {
+          id: 4,
+          type: "arrange",
+          question: "Arrange these words to make a complete introduction:",
+          words: ["to", "meet", "you", "Nice", "I'm", "a", "teacher"],
+          correct: "Nice to meet you, I'm a teacher.",
+          correctFeedback: "Excellent sentence structure! You combined a polite greeting with a professional introduction.",
+          incorrectFeedback: "Start with the greeting 'Nice to meet you,' then add your introduction 'I'm a teacher.'",
+        },
+        // Q5: Comprehension Check (tests L3, L5)
+        {
+          id: 5,
+          type: "comprehension",
+          question: "Read this introduction. What information did the person share?",
+          sentence: "Hi! I'm Priya from Delhi, and my hobby is painting.",
+          options: [
+            "Only their name and city",
+            "Their name, city, and hobby",
+            "Only their hobby",
+            "Their name and job",
+          ],
+          correct: 1,
+          correctFeedback: "Perfect! The person shared three things: name (Priya), origin (Delhi), and hobby (painting).",
+          incorrectFeedback: "Look carefully - the person mentioned their name (Priya), where they're from (Delhi), and their hobby (painting).",
+        },
+        // Q6: Speaking Practice (tests L1, L2, L5)
+        {
+          id: 6,
+          type: "speaking",
+          question: "Now it's your turn to speak!",
+          prompt: "Choose ONE phrase and say it clearly:",
+          options: [
+            "Hey! How's it going?",
+            "Nice to meet you, I'm a student.",
+            "My hobby is reading.",
+          ],
+        },
+      ] as QuizQuestion[],
+    },
   },
   {
     unitId: "unit_2_workplace",

@@ -8,6 +8,8 @@ import { Lesson, Unit } from "@/lib/types/language";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowLeft, MoreVertical, Check, X } from 'lucide-react';
+import { FinalQuizFlow } from '@/components/quiz/FinalQuizFlow';
+import { FinalQuizSummary } from '@/components/quiz/FinalQuizSummary';
 
 interface IndividualQuizProps {
   type: "individual";
@@ -35,6 +37,12 @@ export default function QuizClient(props: Props) {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [showRoleplayCard, setShowRoleplayCard] = useState(false);
+
+  // Final Quiz state
+  const [finalQuizState, setFinalQuizState] = useState<'quiz' | 'summary'>('quiz');
+  const [finalQuizScore, setFinalQuizScore] = useState(0);
+  const [finalQuizXP, setFinalQuizXP] = useState(0);
+  const [quizProgress, setQuizProgress] = useState({ current: 0, total: 0, percent: 0 });
 
   if (props.type === "individual") {
     const { lesson, unitId, lessonNumber, totalLessons } = props;
@@ -288,6 +296,60 @@ export default function QuizClient(props: Props) {
   // Final Quiz
   const { unit, unitId } = props;
 
+  // Check if unit has final quiz data
+  if (!unit.finalQuiz) {
+    return (
+      <div className="w-full -mt-4 -mx-4">
+        <div className="fixed inset-0 flex flex-col bg-bg-primary max-w-[393px] mx-auto left-0 right-0 z-50">
+          <header className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between p-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push('/')}
+                className="h-10 w-10 rounded-full hover:bg-gray-100 text-navy"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="flex-1 mx-4">
+                <h1 className="text-base font-bold text-navy truncate font-display">
+                  Final Quiz Not Available
+                </h1>
+              </div>
+            </div>
+          </header>
+          <main className="flex-1 overflow-y-auto bg-bg-card min-h-0 p-6">
+            <p className="text-text-secondary font-body">
+              The final quiz for this unit is not yet available.
+            </p>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  // Handlers for final quiz
+  const handleFinalQuizComplete = (score: number, xpEarned: number) => {
+    setFinalQuizScore(score);
+    setFinalQuizXP(xpEarned);
+    setFinalQuizState('summary');
+  };
+
+  const handleStartRoleplay = () => {
+    completeFinalQuiz(finalQuizScore, unitId);
+    router.push(`/${unitId}/final/roleplay`);
+  };
+
+  const handleRetryQuiz = () => {
+    setFinalQuizState('quiz');
+    setFinalQuizScore(0);
+    setFinalQuizXP(0);
+  };
+
+  const handleBackHome = () => {
+    router.push('/');
+  };
+
   return (
     <div className="w-full -mt-4 -mx-4">
       <div className="fixed inset-0 flex flex-col bg-bg-primary max-w-[393px] mx-auto left-0 right-0 z-50">
@@ -308,7 +370,7 @@ export default function QuizClient(props: Props) {
                 Final Assessment
               </div>
               <h1 className="text-base font-bold text-navy truncate font-display">
-                {unit.title} - Final Quiz
+                {unit.title}
               </h1>
             </div>
 
@@ -320,30 +382,51 @@ export default function QuizClient(props: Props) {
               <MoreVertical className="h-5 w-5" />
             </Button>
           </div>
+
+          {/* Progress Bar - Only show during quiz */}
+          {finalQuizState === 'quiz' && quizProgress.total > 0 && (
+            <div className="px-4 pb-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-text-secondary font-body">
+                  Question {quizProgress.current} of {quizProgress.total}
+                </span>
+                <span className="text-xs font-bold text-teal font-display">
+                  {Math.round(quizProgress.percent)}%
+                </span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-teal to-teal-hover rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${quizProgress.percent}%` }}
+                />
+              </div>
+            </div>
+          )}
         </header>
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto bg-bg-card min-h-0 p-6">
-          <h1 className="text-3xl font-bold mb-4 text-navy font-display">Final Quiz 🎯</h1>
-          <p className="text-text-secondary mb-6 font-body">
-            Test everything you've learned in {unit.title}
-          </p>
-
-          <div className="bg-yellow-50 p-6 rounded-lg mb-6 border border-yellow-200">
-            <p className="text-sm text-text-primary font-body">
-              📝 <strong>Note:</strong> This is a placeholder for the final quiz. In the next phase, we'll integrate all 7 quiz types.
-            </p>
-          </div>
-
-          <Button
-            onClick={() => {
-              completeFinalQuiz(100, unitId);
-              router.push(`/lesson-complete?type=finalQuiz&unitId=${unitId}`);
-            }}
-            className="w-full bg-coral hover:bg-coral-hover text-white py-4 rounded-[16px] font-semibold shadow-lg transition-all active:scale-95"
-          >
-            Complete Final Quiz (Placeholder)
-          </Button>
+          {finalQuizState === 'quiz' ? (
+            <FinalQuizFlow
+              finalQuiz={unit.finalQuiz}
+              unitId={unitId}
+              unitTitle={unit.title}
+              onComplete={handleFinalQuizComplete}
+              onProgressUpdate={(current, total, percent) => {
+                setQuizProgress({ current, total, percent });
+              }}
+            />
+          ) : (
+            <FinalQuizSummary
+              totalCorrect={Math.round((finalQuizScore / 100) * unit.finalQuiz.totalQuestions)}
+              totalQuestions={unit.finalQuiz.totalQuestions}
+              xpEarned={finalQuizXP}
+              unitTitle={unit.title}
+              onStartRoleplay={handleStartRoleplay}
+              onRetry={handleRetryQuiz}
+              onBackHome={handleBackHome}
+            />
+          )}
         </main>
       </div>
     </div>

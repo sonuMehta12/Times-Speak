@@ -45,11 +45,11 @@ export interface Lesson {
 }
 
 /**
- * Final quiz content (all 7 quiz types)
+ * Final quiz content (pedagogically optimized quiz types)
  */
 export interface FinalQuizContent {
   id: string;
-  questions: any[]; // Will be defined with specific quiz types later
+  questions: import('./quiz').QuizQuestion[];
   totalQuestions: number;
 }
 
