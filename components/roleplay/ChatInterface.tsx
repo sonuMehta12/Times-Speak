@@ -355,7 +355,7 @@ export default function ChatInterface({ scenario, userProfile, onBack }: ChatInt
   };
 
   return (
-    <div className="w-full -mt-4 -mx-4">
+    <div className="w-full">
       <div className="fixed inset-0 flex flex-col bg-bg-primary max-w-[393px] mx-auto left-0 right-0 z-50">
         {/* Header */}
         <header className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm">

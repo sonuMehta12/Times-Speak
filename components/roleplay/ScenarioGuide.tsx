@@ -4,19 +4,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   ArrowLeft,
-  Play,
-  Pause,
-  Volume2,
-  Eye,
-  EyeOff,
-  MessageSquare,
   Target,
-  Loader2,
+  Volume2,
   SkipForward,
+  MessageSquare,
+  Loader2,
+  Play,
+  RotateCcw,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Scenario, UserProfile } from '@/lib/types/roleplay';
 import { streamSpeech, speakWithBrowserTTS } from '@/lib/services/gemini';
 
@@ -27,10 +27,12 @@ interface ScenarioGuideProps {
   onBack: () => void;
 }
 
+type ViewMode = 'preview' | 'listen' | 'completed';
+
 export default function ScenarioGuide({ scenario, userProfile, onStart, onBack }: ScenarioGuideProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('preview');
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTurnIndex, setCurrentTurnIndex] = useState<number>(-1);
-  const [showTranslations, setShowTranslations] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -121,11 +123,6 @@ export default function ScenarioGuide({ scenario, userProfile, onStart, onBack }
 
   // Play through the entire conversation
   const playConversation = async () => {
-    if (isPlaying) {
-      stopAudio();
-      return;
-    }
-
     setIsPlaying(true);
     isPlayingRef.current = true;
     setIsLoadingAudio(true);
@@ -150,14 +147,30 @@ export default function ScenarioGuide({ scenario, userProfile, onStart, onBack }
     setIsPlaying(false);
     isPlayingRef.current = false;
     setIsLoadingAudio(false);
+    setViewMode('completed');
   };
 
-  // Skip to next turn
-  const skipToNext = () => {
-    if (currentTurnIndex < scenario.exampleConversation.length - 1) {
-      stopAudio();
-      setCurrentTurnIndex(currentTurnIndex + 1);
-    }
+  // Start listening
+  const handleListen = () => {
+    setViewMode('listen');
+    setTimeout(() => {
+      playConversation();
+    }, 300);
+  };
+
+  // Listen again
+  const handleListenAgain = () => {
+    setCurrentTurnIndex(-1);
+    stopAudio();
+    setTimeout(() => {
+      playConversation();
+    }, 300);
+  };
+
+  // Skip to practice
+  const handleSkip = () => {
+    stopAudio();
+    onStart();
   };
 
   // Cleanup on unmount
@@ -167,173 +180,308 @@ export default function ScenarioGuide({ scenario, userProfile, onStart, onBack }
     };
   }, []);
 
-  return (
-    <div className="min-h-screen bg-bg-primary pb-6">
-      {/* Header */}
-      <div className="bg-navy text-white p-4">
-        <div className="flex items-center gap-3 mb-4">
-          <Button variant="ghost" size="icon" onClick={onBack} className="text-white hover:bg-white/20 rounded-full">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="font-display text-lg font-bold">{scenario.title}</h1>
-            <p className="text-sm text-white/80">{scenario.description}</p>
+  // PREVIEW VIEW
+  if (viewMode === 'preview') {
+    return (
+      <div className="min-h-screen bg-bg-primary">
+        {/* Sticky Header with Title */}
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="text-navy hover:bg-navy/10 rounded-full"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="font-display text-lg font-bold text-navy flex-1">
+              {scenario.title}
+            </h1>
           </div>
         </div>
 
-        {/* Objective Card */}
-        <Card className="bg-white/10 border-white/20 backdrop-blur">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="bg-gold rounded-full p-2">
-                <Target className="h-4 w-4 text-navy" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-sm mb-1">Learning Objective</h3>
-                <p className="text-sm text-white/90">{scenario.learningObjective}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Listen Mode Instructions */}
-      <div className="px-4 py-6">
-        <div className="bg-gradient-to-br from-teal/10 to-navy/5 border border-teal/20 rounded-[16px] p-4 mb-4">
-          <h3 className="font-display font-bold text-navy mb-2 flex items-center gap-2">
-            <Volume2 className="h-5 w-5 text-teal" />
-            Listen Mode
-          </h3>
-          <p className="text-sm text-text-secondary">
-            First, listen to the perfect conversation. Pay attention to pronunciation, phrasing, and flow. You'll practice
-            this yourself next!
-          </p>
-        </div>
-
-        {/* Playback Controls */}
-        <div className="flex items-center gap-3 mb-6">
-          <Button
-            onClick={playConversation}
-            className={`flex-1 rounded-[16px] h-12 font-semibold ${
-              isPlaying ? 'bg-coral hover:bg-coral/90' : 'bg-navy hover:bg-navy/90'
-            } text-white`}
-          >
-            {isLoadingAudio ? (
-              <>
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                Loading Audio...
-              </>
-            ) : isPlaying ? (
-              <>
-                <Pause className="h-5 w-5 mr-2" />
-                Pause
-              </>
-            ) : (
-              <>
-                <Play className="h-5 w-5 mr-2 fill-current" />
-                Play Conversation
-              </>
-            )}
-          </Button>
-
-          {isPlaying && (
-            <Button
-              onClick={skipToNext}
-              variant="outline"
-              className="rounded-[16px] h-12 border-gray-200"
-              disabled={currentTurnIndex >= scenario.exampleConversation.length - 1}
+        {/* Hero Image */}
+        <div className="relative w-full h-64 bg-gradient-to-br from-navy/5 to-teal/5">
+          <img
+            src={scenario.image}
+            alt={scenario.title}
+            className="w-full h-full object-cover"
+          />
+          {scenario.badge && (
+            <Badge
+              className={`absolute top-4 left-4 ${
+                scenario.badgeColor === 'gold'
+                  ? 'bg-gold text-navy'
+                  : scenario.badgeColor === 'coral'
+                  ? 'bg-coral text-white'
+                  : 'bg-teal text-white'
+              } border-0 rounded-[12px] shadow-md font-semibold`}
             >
-              <SkipForward className="h-5 w-5" />
-            </Button>
+              {scenario.badge}
+            </Badge>
           )}
-
-          <Button
-            onClick={() => setShowTranslations(!showTranslations)}
-            variant="outline"
-            className="rounded-[16px] h-12 border-gray-200"
-          >
-            {showTranslations ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-          </Button>
         </div>
 
-        {/* Conversation Display */}
-        <div className="space-y-4">
-          {scenario.exampleConversation.map((turn, index) => (
-            <div
-              key={index}
-              className={`transition-all duration-300 ${
-                currentTurnIndex === index ? 'scale-[1.02]' : currentTurnIndex > index ? 'opacity-60' : 'opacity-40'
-              }`}
+        {/* Content */}
+        <div className="px-4 py-6 pb-32">
+
+          {/* Learning Objective Card */}
+          <Card className="mb-8 border-gold/30 bg-gradient-to-br from-gold/5 to-navy/5 rounded-[24px] overflow-hidden">
+            <CardContent className="p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 rounded-[16px] bg-gold flex items-center justify-center flex-shrink-0">
+                  <Target className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-display text-base font-bold text-navy mb-2">
+                    Learning Objective
+                  </h3>
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    {scenario.learningObjective}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Listen Mode Info */}
+          <Card className="mb-6 border-teal/20 bg-gradient-to-br from-teal/5 to-navy/5 rounded-[24px] overflow-hidden">
+            <CardContent className="p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 rounded-[16px] bg-teal flex items-center justify-center flex-shrink-0">
+                  <Volume2 className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-display text-base font-bold text-navy mb-2">
+                    Listen Mode
+                  </h3>
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    First, listen to the perfect conversation. Pay attention to pronunciation, phrasing, and flow. You'll practice this yourself next!
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            <Button
+              onClick={handleListen}
+              className="w-full bg-navy text-white hover:bg-navy/90 rounded-[16px] h-14 font-bold text-base shadow-lg"
             >
-              <Card
-                className={`border-gray-200 rounded-[16px] overflow-hidden ${
-                  currentTurnIndex === index ? 'ring-2 ring-teal shadow-lg' : ''
-                }`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        turn.speaker === 'Agent' ? 'bg-navy/10' : 'bg-gold/10'
-                      }`}
-                    >
-                      <MessageSquare className={`h-5 w-5 ${turn.speaker === 'Agent' ? 'text-navy' : 'text-gold'}`} />
-                    </div>
+              <Play className="h-5 w-5 mr-2 fill-current" />
+              Listen to Conversation
+            </Button>
 
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge
-                          className={`${
-                            turn.speaker === 'Agent' ? 'bg-navy text-white' : 'bg-gold text-navy'
-                          } border-0 rounded-[8px] text-xs`}
-                        >
-                          {turn.speaker === 'Agent' ? scenario.role : 'You'}
-                        </Badge>
-                        {currentTurnIndex === index && isLoadingAudio && (
-                          <Loader2 className="h-4 w-4 text-teal animate-spin" />
-                        )}
-                      </div>
+            <Button
+              onClick={handleSkip}
+              variant="outline"
+              className="w-full border-2 border-navy text-navy hover:bg-navy/5 rounded-[16px] h-14 font-semibold text-base"
+            >
+              <SkipForward className="h-5 w-5 mr-2" />
+              Skip & Start Practice
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-                      <p className="text-text-primary font-medium mb-2">{turn.text}</p>
-
-                      {showTranslations && (
-                        <div className="bg-indigo-50/50 border border-indigo-100 rounded-[12px] p-3 mt-2">
-                          <p className="text-sm text-text-secondary italic">
-                            <span className="font-semibold text-xs text-teal uppercase mr-1">
-                              {userProfile.nativeLanguage}:
-                            </span>
-                            {turn.translation}
-                          </p>
-                        </div>
-                      )}
-
-                      {turn.explanation && (
-                        <div className="bg-amber-50 border border-amber-100 rounded-[12px] p-3 mt-2">
-                          <p className="text-xs text-amber-700">
-                            <span className="font-semibold">Tip:</span> {turn.explanation}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+  // LISTEN MODE VIEW
+  if (viewMode === 'listen') {
+    return (
+      <div className="min-h-screen bg-bg-primary flex flex-col">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="text-navy hover:bg-navy/10 rounded-full"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1">
+              <h2 className="font-display text-lg font-bold text-navy">{scenario.title}</h2>
+              <p className="text-xs text-text-secondary">Listen Mode</p>
             </div>
-          ))}
-          <div ref={messagesEndRef} />
+            <Button
+              onClick={handleSkip}
+              variant="ghost"
+              className="text-navy hover:bg-navy/10 rounded-[12px] font-semibold text-sm"
+            >
+              <SkipForward className="h-4 w-4 mr-1.5" />
+              Skip
+            </Button>
+          </div>
         </div>
 
-        {/* Start Practice Button */}
-        <div className="mt-8">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto bg-bg-card px-4 py-6 pb-32">
+          <div className="space-y-8">
+            {scenario.exampleConversation.map((turn, index) => {
+              const isVisible = index <= currentTurnIndex;
+              const isActive = index === currentTurnIndex;
+
+              if (!isVisible) return null;
+
+              const isAgent = turn.speaker === 'Agent';
+
+              return (
+                <div
+                  key={index}
+                  className={`flex items-start gap-3 animate-fade-in ${
+                    !isAgent ? 'flex-row-reverse' : ''
+                  }`}
+                >
+                  <Avatar
+                    className={`w-10 h-10 flex-shrink-0 ${
+                      isAgent
+                        ? 'bg-gradient-to-br from-teal to-teal-400'
+                        : 'bg-gradient-to-br from-gold to-gold-hover'
+                    }`}
+                  >
+                    <AvatarFallback className="text-white font-bold">
+                      {isAgent ? 'AI' : 'You'}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className={`flex-1 max-w-[80%] ${!isAgent ? 'flex flex-col items-end' : ''}`}>
+                    <Card
+                      className={`${
+                        isAgent
+                          ? 'bg-white border-gray-200'
+                          : 'bg-navy text-white border-navy'
+                      } rounded-[20px] ${
+                        isAgent ? 'rounded-tl-lg' : 'rounded-tr-lg'
+                      } shadow-sm ${isActive ? 'ring-2 ring-teal' : ''}`}
+                    >
+                      <CardContent className="p-4">
+                        <p className={`text-sm leading-relaxed ${isAgent ? 'text-text-primary' : 'text-white'}`}>
+                          {turn.text}
+                        </p>
+                        {isActive && isLoadingAudio && (
+                          <div className="flex items-center gap-2 mt-2">
+                            <Loader2 className="h-4 w-4 text-teal animate-spin" />
+                            <span className="text-xs text-teal">Playing...</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Translation hint */}
+                    {turn.translation && isVisible && (
+                      <div className="mt-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-[12px] max-w-full">
+                        <p className="text-xs text-text-secondary italic">
+                          <span className="font-semibold text-teal">Hindi:</span> {turn.translation}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // COMPLETED VIEW
+  if (viewMode === 'completed') {
+    return (
+      <div className="min-h-screen bg-bg-primary flex flex-col">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="text-navy hover:bg-navy/10 rounded-full"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1">
+              <h2 className="font-display text-lg font-bold text-navy">{scenario.title}</h2>
+              <p className="text-xs text-text-secondary">Conversation Complete</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Messages (same as listen mode) */}
+        <div className="flex-1 overflow-y-auto bg-bg-card px-4 py-6 pb-32">
+          <div className="space-y-8">
+            {scenario.exampleConversation.map((turn, index) => {
+              const isAgent = turn.speaker === 'Agent';
+
+              return (
+                <div
+                  key={index}
+                  className={`flex items-start gap-3 ${
+                    !isAgent ? 'flex-row-reverse' : ''
+                  }`}
+                >
+                  <Avatar
+                    className={`w-10 h-10 flex-shrink-0 ${
+                      isAgent
+                        ? 'bg-gradient-to-br from-teal to-teal-400'
+                        : 'bg-gradient-to-br from-gold to-gold-hover'
+                    }`}
+                  >
+                    <AvatarFallback className="text-white font-bold">
+                      {isAgent ? 'AI' : 'You'}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className={`flex-1 max-w-[80%] ${!isAgent ? 'flex flex-col items-end' : ''}`}>
+                    <Card
+                      className={`${
+                        isAgent
+                          ? 'bg-white border-gray-200'
+                          : 'bg-navy text-white border-navy'
+                      } rounded-[20px] ${
+                        isAgent ? 'rounded-tl-lg' : 'rounded-tr-lg'
+                      } shadow-sm`}
+                    >
+                      <CardContent className="p-4">
+                        <p className={`text-sm leading-relaxed ${isAgent ? 'text-text-primary' : 'text-white'}`}>
+                          {turn.text}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* CTAs */}
+        <div className="fixed bottom-0 left-0 right-0 max-w-[393px] mx-auto bg-white border-t border-gray-200 px-4 py-4 space-y-3">
           <Button
             onClick={onStart}
             className="w-full bg-gradient-to-r from-teal to-navy text-white hover:opacity-90 rounded-[16px] h-14 font-bold text-base shadow-lg"
           >
             <MessageSquare className="h-5 w-5 mr-2" />
-            Ready! Start Role-Play Practice
+            Start Practice Role-Play
+          </Button>
+
+          <Button
+            onClick={handleListenAgain}
+            variant="outline"
+            className="w-full border-2 border-navy text-navy hover:bg-navy/5 rounded-[16px] h-12 font-semibold"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Listen Again
           </Button>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }

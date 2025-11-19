@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 
@@ -56,7 +57,15 @@ export default function ConditionalLayout({
   return (
     <>
       {showNavbar && <Navbar />}
-      <main className="mobile-content">{children}</main>
+      <main 
+        className={cn(
+          "mobile-content",
+          shouldHideBoth && "!p-0",
+          shouldHideNavbarOnly && "!pt-4"
+        )}
+      >
+        {children}
+      </main>
       {showFooter && <Footer />}
     </>
   );

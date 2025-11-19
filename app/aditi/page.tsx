@@ -132,7 +132,7 @@ export default function ChatPage() {
   }, [messages, isLoading]);
 
   return (
-    <div className="w-full -mt-4 -mx-4">
+    <div className="w-full">
       <div className="fixed inset-0 flex flex-col bg-bg-card max-w-[393px] mx-auto left-0 right-0 z-50">
         {/* Header - Fixed to top */}
         <header className="flex-shrink-0 bg-white/95 backdrop-blur-lg z-20 border-b border-gray-200 shadow-sm">

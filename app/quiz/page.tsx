@@ -1433,9 +1433,11 @@ export default function QuizPage() {
   return (
     <>
     <PageHeader title="Quiz" />
+    <div className="p-4">
       {quizState === "prep" && <PrepScreen />}
       {quizState === "quiz" && <QuizScreen />}
       {quizState === "results" && <ResultsScreen />}
+    </div>
     </>
   );
 }
