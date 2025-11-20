@@ -10,7 +10,7 @@ import { UserProfile } from '../types/roleplay';
 export const INITIAL_USER_PROFILE: UserProfile = {
   name: 'Rahul',
   level: 'B2', // Upper-Intermediate
-  nativeLanguage: 'Hindi',
+  nativeLanguage: 'Hinglish (हिन्दी)',
 
   learningGoals: [
     'Speak English confidently at work and with strangers',
@@ -43,6 +43,18 @@ export const INITIAL_USER_PROFILE: UserProfile = {
     'In meetings, he has good ideas but struggles to articulate them clearly and confidently. ' +
     'He needs practice with spontaneous conversation and building fluency without the fear of judgment. ' +
     'He benefits most from natural conversation practice that builds his confidence gradually.',
+
+  // Enhanced onboarding fields with default values
+  gender: 'Male',
+  ageRange: '23–27',
+  currentStatus: 'Fresher',
+  interestedField: ['Technology'],
+  primaryGoal: ['Speak confidently at work', 'Clear job interviews'],
+  whatStopsYou: ['Fear of being judged', 'Run out of vocabulary', 'Grammar mistakes'],
+  fearOfSpeaking: 'Sometimes',
+  hardestPart: ['Starting a conversation', 'Finding the right words'],
+  feelingWhenSpeak: 'Slightly nervous but okay',
+  englishLevel: 'intermediate',
 };
 
 /**
