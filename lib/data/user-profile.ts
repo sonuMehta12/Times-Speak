@@ -97,3 +97,108 @@ export function updateUserProfile(updates: Partial<UserProfile>): UserProfile {
   saveUserProfile(updatedProfile);
   return updatedProfile;
 }
+
+/**
+ * Helper function to increment roleplay completed count
+ */
+export function incrementRoleplayCount(): void {
+  const profile = getUserProfile();
+  const updatedProfile = {
+    ...profile,
+    roleplayCompleted: (profile.roleplayCompleted || 0) + 1,
+    lastActiveDate: new Date().toISOString(),
+  };
+  saveUserProfile(updatedProfile);
+}
+
+/**
+ * Helper function to add learning time in minutes
+ */
+export function addLearningTime(minutes: number): void {
+  const profile = getUserProfile();
+  const updatedProfile = {
+    ...profile,
+    totalTimeMinutes: (profile.totalTimeMinutes || 0) + minutes,
+    lastActiveDate: new Date().toISOString(),
+  };
+  saveUserProfile(updatedProfile);
+}
+
+/**
+ * Helper function to update streak and last active date
+ * Call this when user completes any learning activity
+ */
+export function updateStreak(): void {
+  const profile = getUserProfile();
+  const now = new Date();
+  const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
+
+  // Get last active date
+  const lastActive = profile.lastActiveDate
+    ? new Date(profile.lastActiveDate).toISOString().split('T')[0]
+    : null;
+
+  let newStreak = profile.currentStreak || 0;
+
+  if (!lastActive) {
+    // First activity ever
+    newStreak = 1;
+  } else if (lastActive === today) {
+    // Already active today, don't change streak
+    return;
+  } else {
+    // Calculate days difference
+    const lastDate = new Date(lastActive);
+    const diffTime = now.getTime() - lastDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) {
+      // Consecutive day - increment streak
+      newStreak = (profile.currentStreak || 0) + 1;
+    } else {
+      // Missed days - reset streak to 1
+      newStreak = 1;
+    }
+  }
+
+  const updatedProfile = {
+    ...profile,
+    currentStreak: newStreak,
+    lastActiveDate: now.toISOString(),
+  };
+  saveUserProfile(updatedProfile);
+}
+
+/**
+ * Helper function to get formatted learning time
+ */
+export function getFormattedLearningTime(profile: UserProfile): string {
+  const minutes = profile.totalTimeMinutes || 0;
+
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (remainingMinutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${remainingMinutes}m`;
+}
+
+/**
+ * Helper function to get formatted join date
+ */
+export function getFormattedJoinDate(profile: UserProfile): string {
+  if (!profile.joinDate) {
+    return 'Recently joined';
+  }
+
+  const joinDate = new Date(profile.joinDate);
+  const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long' };
+
+  return `Joined ${joinDate.toLocaleDateString('en-US', options)}`;
+}
