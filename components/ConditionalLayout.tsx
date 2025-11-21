@@ -13,7 +13,8 @@ import Footer from "./Footer";
 const HIDE_BOTH_ROUTES = [
   "/role",
   "/quiz",
-  "/aditi"
+  "/aditi",
+  "/onboarding"
   // Add more routes here as needed
 ];
 
