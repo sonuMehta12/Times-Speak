@@ -6,9 +6,10 @@ import { getScenarioById } from "@/lib/data/roleplay-scenarios";
 import { getUserProfile } from "@/lib/data/user-profile";
 import ScenarioGuide from "@/components/roleplay/ScenarioGuide";
 import ChatInterface from "@/components/roleplay/ChatInterface";
-import { Scenario, UserProfile } from "@/lib/types/roleplay";
+import RoleplayResults from "@/components/roleplay/RoleplayResults";
+import { Scenario, UserProfile, Message } from "@/lib/types/roleplay";
 
-type ViewMode = 'guide' | 'chat';
+type ViewMode = 'guide' | 'chat' | 'feedback';
 
 export default function RoleplayPage() {
   const params = useParams();
@@ -18,6 +19,7 @@ export default function RoleplayPage() {
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('guide');
+  const [completedConversation, setCompletedConversation] = useState<Message[]>([]);
 
   useEffect(() => {
     // Load scenario data
@@ -57,12 +59,44 @@ export default function RoleplayPage() {
     router.push('/explore');
   };
 
+  const handleConversationComplete = (messages: Message[]) => {
+    setCompletedConversation(messages);
+    setViewMode('feedback');
+  };
+
+  const handleFeedbackNavigate = (destination: 'explore' | 'retake') => {
+    if (destination === 'explore') {
+      router.push('/explore');
+    } else {
+      // Retake: Go back to guide view to restart
+      setViewMode('guide');
+      setCompletedConversation([]);
+    }
+  };
+
+  const handleBackFromFeedback = () => {
+    router.push('/explore');
+  };
+
+  if (viewMode === 'feedback') {
+    return (
+      <RoleplayResults
+        scenario={scenario}
+        userProfile={userProfile}
+        messages={completedConversation}
+        onNavigate={handleFeedbackNavigate}
+        onBack={handleBackFromFeedback}
+      />
+    );
+  }
+
   if (viewMode === 'chat') {
     return (
       <ChatInterface
         scenario={scenario}
         userProfile={userProfile}
         onBack={handleBackToGuide}
+        onConversationComplete={handleConversationComplete}
       />
     );
   }

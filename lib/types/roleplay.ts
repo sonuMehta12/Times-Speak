@@ -13,6 +13,25 @@ export interface UserProfile {
     conversation: string[];
   };
   challengesContext: string;
+
+  // Enhanced onboarding fields
+  gender?: string;
+  ageRange?: string;
+  currentStatus?: string;
+  interestedField?: string[];
+  primaryGoal?: string[];
+  whatStopsYou?: string[];
+  fearOfSpeaking?: string;
+  hardestPart?: string[];
+  feelingWhenSpeak?: string;
+  englishLevel?: string;
+
+  // Progress tracking fields
+  joinDate?: string; // ISO date string when user completed onboarding
+  currentStreak?: number; // Consecutive days of learning
+  totalTimeMinutes?: number; // Total learning time in minutes
+  roleplayCompleted?: number; // Number of roleplay sessions completed
+  lastActiveDate?: string; // ISO date string of last activity
 }
 
 /**
@@ -83,3 +102,71 @@ export interface GeminiResponse {
  * View states for the roleplay flow
  */
 export type RoleplayViewState = 'selection' | 'guide' | 'chat';
+
+/**
+ * Pronunciation mistake for detailed feedback
+ */
+export interface PronunciationMistake {
+  word: string;
+  phoneticUser: string;
+  phoneticTarget: string;
+  score: number;
+}
+
+/**
+ * Grammar correction for feedback
+ */
+export interface GrammarCorrection {
+  original: string;
+  corrected: string;
+  explanation: string;
+}
+
+/**
+ * Vocabulary upgrade suggestion
+ */
+export interface VocabularyUpgrade {
+  original: string;
+  alternatives: string[];
+  context: string;
+}
+
+/**
+ * Fluency metric
+ */
+export interface FluencyMetric {
+  label: string;
+  value: string;
+  status: 'good' | 'warning' | 'bad';
+}
+
+/**
+ * Skill-specific details for feedback
+ */
+export interface SkillDetails {
+  score: number;
+  strength: string;
+  improvement: string;
+  coachTip: string;
+  pronunciationData?: PronunciationMistake[];
+  grammarData?: GrammarCorrection[];
+  vocabularyData?: VocabularyUpgrade[];
+  fluencyData?: FluencyMetric[];
+}
+
+/**
+ * Complete conversation analysis result
+ */
+export interface ConversationAnalysis {
+  overallScore: number;
+  cefrLevel: string;
+  aiCoachInsight: string;
+  skills: {
+    pronunciation: SkillDetails;
+    vocabulary: SkillDetails;
+    grammar: SkillDetails;
+    fluency: SkillDetails;
+    clarity: SkillDetails;
+    listening: SkillDetails;
+  };
+}

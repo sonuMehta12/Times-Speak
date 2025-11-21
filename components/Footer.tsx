@@ -13,7 +13,6 @@ export default function Footer() {
     { href: "/", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: Compass },
     { href: "/aditi", label: "Aditi", icon: null, isAI: true }, // Special AI tutor item
-    { href: "/learn", label: "Learn", icon: BookOpen },
     { href: "/profile", label: "Profile", icon: User },
   ];
 

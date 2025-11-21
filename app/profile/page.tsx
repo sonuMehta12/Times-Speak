@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, LogOut, Bell, Shield, HelpCircle, Flame, Clock, BookOpen, User as UserIcon, ArrowLeft } from 'lucide-react';
+import { ChevronRight, LogOut, Bell, Shield, HelpCircle, Flame, Clock, Target, User as UserIcon, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { getUserProfile, getFormattedLearningTime, getFormattedJoinDate } from '@/lib/data/user-profile';
+import { UserProfile } from '@/lib/types/roleplay';
 
 // Settings Row Component
 const SettingsRow: React.FC<{
@@ -56,30 +58,13 @@ const StatCard: React.FC<{
 );
 
 export default function ProfilePage() {
-  const router = useRouter();
-  const [userName, setUserName] = useState("John");
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
-  // Load user data from localStorage
+  // Load user profile from localStorage
   useEffect(() => {
-    const userData = localStorage.getItem('userData');
-    if (userData) {
-      try {
-        const parsedData = JSON.parse(userData);
-        setUserName(parsedData.userName || 'John');
-      } catch (err) {
-        console.error('Error parsing user data:', err);
-      }
-    }
+    const profile = getUserProfile();
+    setUserProfile(profile);
   }, []);
-
-  const handleBack = () => {
-    window.history.back();
-  };
-
-  const handleEditProfile = () => {
-    // Navigate to edit profile page
-    console.log('Edit profile');
-  };
 
   const handleAccountSettings = () => {
     console.log('Account settings');
@@ -98,13 +83,23 @@ export default function ProfilePage() {
   };
 
   const handleLogout = () => {
-    // Clear onboarding data to restart flow
+    // Clear all user data to restart flow
     localStorage.removeItem('onboardingCompleted');
+    localStorage.removeItem('lingoRoleplay_userProfile');
     localStorage.removeItem('userData');
-    
+
     // Reload the page to trigger onboarding
     window.location.reload();
   };
+
+  // Show loading state while profile loads
+  if (!userProfile) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center">
+        <p className="text-text-secondary">Loading profile...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -115,17 +110,27 @@ export default function ProfilePage() {
         <div className="relative mb-4">
           <Avatar className="w-24 h-24 bg-coral border-4 border-white shadow-lg">
             <AvatarFallback className="bg-coral text-white font-bold text-5xl">
-              {userName.charAt(0).toUpperCase()}
+              {userProfile.name.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
         </div>
         <h2 className="font-display text-3xl font-bold text-navy mb-1">
-          {userName}
+          {userProfile.name}
         </h2>
-        <p className="text-text-secondary text-sm mb-3">
-          Joined November 2023
+        <p className="text-text-secondary text-sm mb-2">
+          {getFormattedJoinDate(userProfile)}
         </p>
-        
+        <div className="flex items-center gap-2 mb-3">
+          <span className="px-3 py-1 bg-teal/10 text-teal text-xs font-semibold rounded-full">
+            {userProfile.level} - {userProfile.englishLevel === 'beginner' ? 'Beginner' : userProfile.englishLevel === 'intermediate' ? 'Intermediate' : userProfile.englishLevel === 'advanced' ? 'Advanced' : 'Near-Native'}
+          </span>
+        </div>
+        {userProfile.currentStatus && (
+          <p className="text-text-secondary text-xs">
+            {userProfile.currentStatus}
+            {userProfile.interestedField && userProfile.interestedField.length > 0 && ` • ${userProfile.interestedField.join(', ')}`}
+          </p>
+        )}
       </section>
 
       {/* Stats Section */}
@@ -134,29 +139,71 @@ export default function ProfilePage() {
           Your Progress
         </h3>
         <div className="grid grid-cols-3 gap-3">
-          <StatCard 
-            icon={Flame} 
-            value="3" 
-            label="Day Streak" 
-            color="bg-coral/10" 
-            iconColor="text-coral" 
+          <StatCard
+            icon={Flame}
+            value={userProfile.currentStreak?.toString() || '0'}
+            label="Day Streak"
+            color="bg-coral/10"
+            iconColor="text-coral"
           />
-          <StatCard 
-            icon={Clock} 
-            value="12h" 
-            label="Time Learned" 
-            color="bg-teal/10" 
-            iconColor="text-teal" 
+          <StatCard
+            icon={Clock}
+            value={getFormattedLearningTime(userProfile)}
+            label="Time Learned"
+            color="bg-teal/10"
+            iconColor="text-teal"
           />
-          <StatCard 
-            icon={BookOpen} 
-            value="84" 
-            label="Words Mastered" 
-            color="bg-navy/10" 
-            iconColor="text-navy" 
+          <StatCard
+            icon={Target}
+            value={userProfile.roleplayCompleted?.toString() || '0'}
+            label="Roleplays"
+            color="bg-navy/10"
+            iconColor="text-navy"
           />
         </div>
       </section>
+
+      {/* Learning Journey Section */}
+      {userProfile.learningGoals && userProfile.learningGoals.length > 0 && (
+        <section className="mb-8 animate-fade-in-up" style={{ animationDelay: '250ms' }}>
+          <h3 className="font-display text-lg font-bold text-navy mb-4">
+            Your Learning Goals
+          </h3>
+          <Card className="bg-gradient-to-br from-teal/5 to-coral/5 border-2 border-gray-200 rounded-[20px] shadow-sm">
+            <CardContent className="p-5 space-y-3">
+              {userProfile.learningGoals.slice(0, 3).map((goal, index) => (
+                <div key={index} className="flex items-start gap-3">
+                  <div className="mt-1">
+                    <div className="w-2 h-2 rounded-full bg-teal"></div>
+                  </div>
+                  <p className="text-sm text-text-primary font-medium leading-relaxed">
+                    {goal}
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
+      {/* Challenges Section */}
+      {userProfile.challenges?.primary && userProfile.challenges.primary.length > 0 && (
+        <section className="mb-8 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+          <h3 className="font-display text-lg font-bold text-navy mb-4">
+            Working On
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {userProfile.challenges.primary.slice(0, 4).map((challenge, index) => (
+              <span
+                key={index}
+                className="px-3 py-2 bg-white border-2 border-gray-200 rounded-[12px] text-xs font-semibold text-text-secondary hover:border-coral hover:text-coral transition-colors"
+              >
+                {challenge}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Settings Section */}
       <section className="space-y-3 animate-fade-in-up" style={{ animationDelay: '300ms' }}>

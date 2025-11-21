@@ -22,14 +22,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Message, Scenario, UserProfile } from '@/lib/types/roleplay';
 import { generateAgentResponseStream, speakWithBrowserTTS } from '@/lib/services/gemini';
+import { incrementRoleplayCount, updateStreak } from '@/lib/data/user-profile';
 
 interface ChatInterfaceProps {
   scenario: Scenario;
   userProfile: UserProfile;
   onBack: () => void;
+  onConversationComplete?: (messages: Message[]) => void;
 }
 
-export default function ChatInterface({ scenario, userProfile, onBack }: ChatInterfaceProps) {
+export default function ChatInterface({ scenario, userProfile, onBack, onConversationComplete }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -50,6 +52,7 @@ export default function ChatInterface({ scenario, userProfile, onBack }: ChatInt
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioChain = useRef<Promise<void>>(Promise.resolve());
   const isPlayingRef = useRef(false);
+  const hasTrackedCompletion = useRef(false);
 
   // Stop all audio playback
   const stopAudio = () => {
@@ -105,6 +108,19 @@ export default function ChatInterface({ scenario, userProfile, onBack }: ChatInt
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, showSuggestions, showTranslation, isLoading, isTyping]);
+
+  // Track completion for progress
+  useEffect(() => {
+    if (isCompleted && !hasTrackedCompletion.current) {
+      hasTrackedCompletion.current = true;
+
+      // Update user progress
+      incrementRoleplayCount();
+      updateStreak();
+
+      console.log('Roleplay completed! Progress updated.');
+    }
+  }, [isCompleted]);
 
   // Speech Recognition
   const toggleListening = () => {
@@ -640,7 +656,7 @@ export default function ChatInterface({ scenario, userProfile, onBack }: ChatInt
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Retake
               </Button>
-              <Button onClick={onBack} className="flex-1 py-3 rounded-2xl bg-coral hover:bg-coral-hover text-white font-semibold shadow-lg">
+              <Button onClick={() => onConversationComplete ? onConversationComplete(messages) : onBack()} className="flex-1 py-3 rounded-2xl bg-coral hover:bg-coral-hover text-white font-semibold shadow-lg">
                 Continue
               </Button>
             </div>
