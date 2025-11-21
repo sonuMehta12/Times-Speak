@@ -237,7 +237,7 @@ export async function analyzeConversation(
       },
     });
 
-    const analysisText = response.text;
+    const analysisText = response.text || '{}';
     const analysis = JSON.parse(analysisText);
 
     return {

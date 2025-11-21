@@ -87,7 +87,7 @@ export function SpeakingQuiz({
         clearTimeout(processingTimeoutRef.current);
       }
       if (recognitionRef.current) {
-        recognitionRef.current.abort();
+        recognitionRef.current.stop();
       }
     };
   }, [selectedPhraseIndex]);
