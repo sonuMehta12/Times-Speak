@@ -1,135 +1,303 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Sparkles, Volume2, Languages, Lightbulb, Mic, MessageCircle, Keyboard, ChevronDown, Star, Captions, MicOff, Phone } from 'lucide-react';
+import { ArrowLeft, Volume2, Languages, Lightbulb, Mic, Keyboard, ChevronDown, Star, MicOff, Phone, Send, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { startLiveSession } from '@/lib/geminiLive';
-import type { LiveServerMessage } from '@google/genai';
+import { getUserProfile } from '@/lib/data/user-profile';
+import { generateAditiResponse, generateSpeechBase64, playAudioFromBase64, convertToConversationHistory } from '@/lib/services/aditi-tutor';
+import { getRandomAditiGreeting, getGreetingHinglish, getGreetingHints } from '@/lib/utils/aditi-greetings';
+import { AditiMessage } from '@/lib/types/aditi';
+import { UserProfile } from '@/lib/types/roleplay';
 
-type Mode = 'chat' | 'call';
 type MessageSender = 'user' | 'ai';
 
-interface Message {
-  id: number;
-  sender: MessageSender;
-  text: string;
-  time: string;
-  translation?: {
-    language: string;
-    text: string;
-  };
-  teachingBadge?: string;
-  feedback?: {
-    grade: string;
-    original: string;
-    corrected: string;
-  };
-}
-
 export default function ChatPage() {
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userName, setUserName] = useState('John');
-  
+
+  // Ref to track if greeting has been initialized
+  const greetingInitialized = useRef(false);
+
   // Load user data from localStorage
   useEffect(() => {
-    const userData = localStorage.getItem('userData');
-    if (userData) {
+    // Prevent multiple initializations
+    if (greetingInitialized.current) return;
+    greetingInitialized.current = true;
+
+    const initializeAditi = async () => {
+      const profile = getUserProfile();
+      setUserProfile(profile);
+      setUserName(profile.name || 'John');
+
+      // Initialize with a random greeting
+      const greeting = getRandomAditiGreeting(profile);
+      const hinglish = getGreetingHinglish(profile);
+      const hints = getGreetingHints(profile);
+
+      // Show greeting immediately (don't wait for audio)
+      const greetingMessage: AditiMessage = {
+        id: 1,
+        sender: 'ai',
+        text: greeting,
+        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        translation: {
+          language: 'Hinglish Translation',
+          text: hinglish
+        },
+        hints
+      };
+
+      setMessages([greetingMessage]);
+      setCurrentHints(hints);
+
+      // Generate TTS audio for greeting in background
       try {
-        const parsedData = JSON.parse(userData);
-        setUserName(parsedData.userName || 'John');
+        const greetingAudio = await generateSpeechBase64(greeting);
+        // Update message with audio
+        const updatedGreeting = { ...greetingMessage, audioBase64: greetingAudio };
+        setMessages([updatedGreeting]);
+
+        // Auto-play greeting audio immediately (only once)
+        try {
+          // Initialize and resume audio context for auto-play
+          const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioContext) {
+            const ctx = new AudioContext();
+            if (ctx.state === 'suspended') {
+              await ctx.resume();
+            }
+            await ctx.close();
+          }
+
+          // Enable auto-play for future messages
+          setAutoPlayEnabled(true);
+
+          // Play the greeting audio
+          await playAudioFromBase64(greetingAudio);
+        } catch (audioErr) {
+          console.log('Auto-play blocked by browser - user interaction required:', audioErr);
+          // This is expected on some browsers - audio will play on first user interaction
+        }
       } catch (err) {
-        console.error('Error parsing user data:', err);
+        console.error('Greeting TTS generation failed:', err);
       }
-    }
+    };
+
+    initializeAditi();
   }, []);
-  const [mode, setMode] = useState<Mode>('chat');
-  const [callDuration, setCallDuration] = useState(0);
-  const [messages, setMessages] = useState<Message[]>([
-    { 
-      id: 1, 
-      sender: 'ai', 
-      text: `Hi ${userName}! Let's practice polite requests. Try saying: <strong>"Could you please pass me the salt?"</strong>`, 
-      time: "10:05 AM", 
-      teachingBadge: 'New Phrase' 
-    },
-    { 
-      id: 2, 
-      sender: 'user', 
-      text: `Could you pass to me the salt?`, 
-      time: "10:06 AM", 
-      feedback: { 
-        grade: 'Good try!',
-        original: `Could you pass <span class="bg-error/20 text-error px-1 rounded font-medium">to me</span> the salt?`,
-        corrected: `Could you <span class="bg-success/20 text-success px-1 rounded font-medium">please</span> pass <span class="bg-success/20 text-success px-1 rounded font-medium">me</span> the salt?`,
-      } 
-    },
-    { 
-      id: 3, 
-      sender: 'ai', 
-      text: `For natural phrasing, say "pass me" and add "please" to be more polite. Great start!`, 
-      time: "10:07 AM" 
-    },
-    { 
-      id: 4, 
-      sender: 'ai', 
-      text: `Good attempt! You got the main idea right. Let's try another one. How would you ask someone to open the window?`, 
-      time: "10:07 AM", 
-      translation: { 
-        language: 'Hinglish Translation', 
-        text: 'Badhiya koshish! Chalo ek aur try karte hain.' 
-      } 
-    }
-  ]);
+
+  const [messages, setMessages] = useState<AditiMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentHints, setCurrentHints] = useState<string[]>([]);
+  const [showHintModal, setShowHintModal] = useState(false);
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const [typeInput, setTypeInput] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [autoPlayEnabled, setAutoPlayEnabled] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
-    const secs = (seconds % 60).toString().padStart(2, '0');
-    return `${minutes}:${secs}`;
-  };
+  // Speech recognition
+  const recognitionRef = useRef<any>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-  
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-    if (mode === 'call') {
-      setCallDuration(0);
-      intervalId = setInterval(() => {
-        setCallDuration(d => d + 1);
-      }, 1000);
-    }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [mode]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(true), 1000);
-    const newMsgTimer = setTimeout(() => {
-      setIsLoading(false);
-      setMessages(prev => [...prev, {
-        id: 5,
-        sender: 'ai',
-        text: "Just let me know when you're ready to try!",
-        time: "10:08 AM"
-      }]);
-    }, 3000);
-    
-    return () => {
-      clearTimeout(timer);
-      clearTimeout(newMsgTimer);
-    };
-  }, []);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  // Handle sending a message to Aditi
+  const handleSendMessage = async (messageText: string) => {
+    if (!messageText.trim() || !userProfile) return;
+
+    // Ensure auto-play is enabled after first user interaction
+    // Also initialize audio context on first interaction (required by browsers)
+    let shouldEnableAutoPlay = false;
+    if (!autoPlayEnabled) {
+      shouldEnableAutoPlay = true;
+      try {
+        // Initialize audio context with user gesture
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContext) {
+          const ctx = new AudioContext();
+          if (ctx.state === 'suspended') {
+            await ctx.resume();
+          }
+          await ctx.close();
+        }
+        setAutoPlayEnabled(true);
+      } catch (err) {
+        console.log('Audio context initialization:', err);
+      }
+    }
+
+    const userMessageTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    // Add user message to chat
+    const userMsg: AditiMessage = {
+      id: messages.length + 1,
+      sender: 'user',
+      text: messageText,
+      time: userMessageTime
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setIsLoading(true);
+    setShowHintModal(false);
+    setShowTypeModal(false);
+    setTypeInput('');
+
+    try {
+      // Convert messages to conversation history
+      const history = convertToConversationHistory(messages);
+
+      // Get AI response
+      const response = await generateAditiResponse(userProfile, history, messageText);
+
+      // Generate TTS audio for the response
+      let audioBase64: string | undefined;
+      try {
+        audioBase64 = await generateSpeechBase64(response.message);
+      } catch (err) {
+        console.error('TTS generation failed:', err);
+      }
+
+      const aiMessageTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+      // Add AI response to chat
+      const aiMsg: AditiMessage = {
+        id: messages.length + 2,
+        sender: 'ai',
+        text: response.message,
+        time: aiMessageTime,
+        translation: {
+          language: 'Hinglish Translation',
+          text: response.hinglish
+        },
+        hints: response.hint,
+        audioBase64,
+        feedback: response.feedback
+      };
+
+      setMessages(prev => [...prev, aiMsg]);
+      setCurrentHints(response.hint);
+
+      // Auto-play audio for AI response - always try to play
+      if (audioBase64) {
+        try {
+          await playAudioFromBase64(audioBase64);
+        } catch (err) {
+          console.error('Auto-play audio failed:', err);
+          // If auto-play fails and we just enabled it, try again after a brief delay
+          if (shouldEnableAutoPlay) {
+            setTimeout(async () => {
+              try {
+                await playAudioFromBase64(audioBase64);
+              } catch (retryErr) {
+                console.log('Audio auto-play blocked - click speaker icon to play');
+              }
+            }, 100);
+          }
+        }
+      }
+
+      // If there's feedback for the user's message, add it to the user message
+      if (response.feedback) {
+        setMessages(prev => prev.map(msg =>
+          msg.id === userMsg.id
+            ? { ...msg, feedback: response.feedback }
+            : msg
+        ));
+      }
+
+    } catch (error) {
+      console.error('Error getting Aditi response:', error);
+
+      // Fallback error message
+      const errorMsg: AditiMessage = {
+        id: messages.length + 2,
+        sender: 'ai',
+        text: "I'm sorry, I had trouble processing that. Could you try again?",
+        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        translation: {
+          language: 'Hinglish Translation',
+          text: 'Sorry, mujhe problem ho gayi. Kya tum phir se try kar sakte ho?'
+        },
+        hints: ['Let me try again.', 'I understand.', 'What should we do next?']
+      };
+
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Type button
+  const handleTypeSubmit = () => {
+    if (typeInput.trim()) {
+      handleSendMessage(typeInput);
+    }
+  };
+
+  // Handle Hint selection
+  const handleHintSelect = (hint: string) => {
+    handleSendMessage(hint);
+  };
+
+  // Handle Speak button - Speech recognition
+  const handleSpeakStart = () => {
+    // Stop any existing recognition first (restart from beginning)
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // Ignore errors when stopping
+      }
+    }
+
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      handleSendMessage(transcript);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const handleSpeakStop = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    }
+  };
 
   return (
     <div className="w-full">
@@ -138,9 +306,9 @@ export default function ChatPage() {
         <header className="flex-shrink-0 bg-white/95 backdrop-blur-lg z-20 border-b border-gray-200 shadow-sm">
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center gap-3">
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => window.history.back()}
                 className="h-10 w-10 rounded-full hover:bg-gray-100 text-navy flex-shrink-0"
                 aria-label="Go back"
@@ -159,79 +327,135 @@ export default function ChatPage() {
                 <p className="text-sm text-success font-medium font-body">Active now</p>
               </div>
             </div>
-            
+
+            {/* Only Call Button - No Toggle */}
             <div className="flex items-center gap-3">
-              {mode === 'call' && (
-                <div className="font-mono text-navy font-semibold text-base" aria-label="Call duration">
-                  {formatTime(callDuration)}
-                </div>
-              )}
-              <div className="flex items-center bg-gray-100 rounded-full p-1 gap-1">
-                <Button 
-                  onClick={() => setMode('chat')} 
-                  variant="ghost"
-                  size="sm"
-                  className={`px-3 py-1.5 h-auto rounded-full text-xs font-semibold transition-colors ${
-                    mode === 'chat' ? 'bg-navy text-white shadow-sm hover:bg-navy-hover hover:text-white' : 'text-text-secondary hover:bg-transparent'
-                  }`}
-                >
-                  <MessageCircle className="h-4 w-4 inline mr-1.5" /> Chat
-                </Button>
-                <Button 
-                  onClick={() => setMode('call')} 
-                  variant="ghost"
-                  size="sm"
-                  className={`px-3 py-1.5 h-auto rounded-full text-xs font-semibold transition-colors ${
-                    mode === 'call' ? 'bg-navy text-white shadow-sm hover:bg-navy-hover hover:text-white' : 'text-text-secondary hover:bg-transparent'
-                  }`}
-                >
-                  <Mic className="h-4 w-4 inline mr-1.5" /> Call
-                </Button>
-              </div>
+              <Button
+                onClick={() => window.location.href = '/aditi'}
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full bg-teal/10 hover:bg-teal/20 text-teal"
+                aria-label="Start voice call"
+              >
+                <Phone className="h-5 w-5" />
+              </Button>
             </div>
           </div>
         </header>
 
         {/* Main Content - Scrollable */}
         <main className="flex-1 overflow-y-auto bg-bg-card">
-          {mode === 'chat' ? (
-            <ChatView 
-              messages={messages} 
-              isLoading={isLoading} 
-              userName={userName} 
-              messagesEndRef={messagesEndRef} 
-            />
-          ) : (
-            <CallView userName={userName} callDuration={callDuration} />
-          )}
+          <ChatView
+            messages={messages}
+            isLoading={isLoading}
+            userName={userName}
+            messagesEndRef={messagesEndRef}
+          />
         </main>
 
         {/* Footer Action Bar - Fixed to bottom */}
-        {mode === 'chat' && (
-          <footer className="flex-shrink-0 bg-white/95 backdrop-blur-lg border-t border-gray-200 p-4 shadow-sm">
-            <div className="flex justify-around items-center">
-              <button className="flex flex-col items-center gap-1.5 text-text-secondary hover:text-navy transition-colors">
-                <div className="h-14 w-14 bg-gray-100 rounded-[20px] flex items-center justify-center text-text-primary shadow-sm hover:bg-gray-200 transition-all">
-                  <Keyboard className="h-6 w-6" />
-                </div>
-                <span className="text-xs font-semibold font-body">Type</span>
-              </button>
-              
-              <button className="flex flex-col items-center gap-1.5 text-text-secondary hover:text-navy transition-colors transform -translate-y-2">
-                <div className="h-16 w-16 bg-coral text-white rounded-full flex items-center justify-center shadow-lg shadow-coral/30 hover:bg-coral-hover transition-all">
-                  <Mic className="h-7 w-7" />
-                </div>
-                <span className="text-xs font-semibold font-body">Speak</span>
-              </button>
-              
-              <button className="flex flex-col items-center gap-1.5 text-text-secondary hover:text-navy transition-colors">
-                <div className="h-14 w-14 bg-gray-100 rounded-[20px] flex items-center justify-center text-text-primary shadow-sm hover:bg-gray-200 transition-all">
-                  <Lightbulb className="h-6 w-6" />
-                </div>
-                <span className="text-xs font-semibold font-body">Hint</span>
-              </button>
+        <footer className="flex-shrink-0 bg-white/95 backdrop-blur-lg border-t border-gray-200 p-4 shadow-sm">
+          <div className="flex justify-around items-center">
+            <button
+              onClick={() => setShowTypeModal(true)}
+              className="flex flex-col items-center gap-1.5 text-text-secondary hover:text-navy transition-colors"
+            >
+              <div className="h-14 w-14 bg-gray-100 rounded-[20px] flex items-center justify-center text-text-primary shadow-sm hover:bg-gray-200 transition-all">
+                <Keyboard className="h-6 w-6" />
+              </div>
+              <span className="text-xs font-semibold font-body">Type</span>
+            </button>
+
+            <button
+              onClick={isRecording ? handleSpeakStop : handleSpeakStart}
+              className="flex flex-col items-center gap-1.5 text-text-secondary hover:text-navy transition-colors transform -translate-y-2"
+            >
+              <div className={`h-16 w-16 rounded-full flex items-center justify-center shadow-lg transition-all ${
+                isRecording ? 'bg-error text-white shadow-error/30 animate-pulse' : 'bg-coral text-white shadow-coral/30 hover:bg-coral-hover'
+              }`}>
+                {isRecording ? <MicOff className="h-7 w-7" /> : <Mic className="h-7 w-7" />}
+              </div>
+              <span className="text-xs font-semibold font-body">{isRecording ? 'Stop' : 'Speak'}</span>
+            </button>
+
+            <button
+              onClick={() => setShowHintModal(true)}
+              disabled={currentHints.length === 0}
+              className="flex flex-col items-center gap-1.5 text-text-secondary hover:text-navy transition-colors disabled:opacity-50"
+            >
+              <div className="h-14 w-14 bg-gray-100 rounded-[20px] flex items-center justify-center text-text-primary shadow-sm hover:bg-gray-200 transition-all">
+                <Lightbulb className="h-6 w-6" />
+              </div>
+              <span className="text-xs font-semibold font-body">Hint</span>
+            </button>
+          </div>
+        </footer>
+
+        {/* Type Modal */}
+        {showTypeModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center max-w-[393px] mx-auto left-0 right-0">
+            <div className="bg-white w-full rounded-t-3xl p-6 animate-slide-up">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-lg text-text-primary">Type your message</h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowTypeModal(false)}
+                  className="h-8 w-8 rounded-full"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+              <textarea
+                value={typeInput}
+                onChange={(e) => setTypeInput(e.target.value)}
+                placeholder="Type what you want to say..."
+                className="w-full min-h-[120px] p-3 border border-gray-200 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-navy/20 font-body"
+                autoFocus
+              />
+              <Button
+                onClick={handleTypeSubmit}
+                disabled={!typeInput.trim()}
+                className="w-full mt-4 bg-navy hover:bg-navy-hover text-white rounded-full py-3 font-semibold flex items-center justify-center gap-2"
+              >
+                <Send className="h-5 w-5" />
+                Send Message
+              </Button>
             </div>
-          </footer>
+          </div>
+        )}
+
+        {/* Hint Modal */}
+        {showHintModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center max-w-[393px] mx-auto left-0 right-0">
+            <div className="bg-white w-full rounded-t-3xl p-6 animate-slide-up">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-lg text-text-primary">Choose a response</h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowHintModal(false)}
+                  className="h-8 w-8 rounded-full"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+              <div className="space-y-3">
+                {currentHints.map((hint, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleHintSelect(hint)}
+                    className="w-full text-left p-4 border-2 border-gray-200 rounded-2xl hover:border-navy hover:bg-navy/5 transition-all font-body text-text-primary"
+                  >
+                    <span className="text-xs text-text-secondary font-semibold mb-1 block">
+                      {index === 0 ? 'Simple' : index === 1 ? 'Professional' : 'Engaging'}
+                    </span>
+                    {hint}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -239,17 +463,22 @@ export default function ChatPage() {
 }
 
 // Chat View Component
-const ChatView: React.FC<{ 
-  messages: Message[]; 
-  isLoading: boolean; 
-  userName: string; 
-  messagesEndRef: React.RefObject<HTMLDivElement> 
+const ChatView: React.FC<{
+  messages: AditiMessage[];
+  isLoading: boolean;
+  userName: string;
+  messagesEndRef: React.RefObject<HTMLDivElement>
 }> = ({ messages, isLoading, userName, messagesEndRef }) => (
-  <div className="px-4 py-4 space-y-4">
+  <div className="px-4 py-6 space-y-5">
+    {messages.length === 0 && !isLoading && (
+      <div className="flex items-center justify-center h-full text-text-secondary text-sm">
+        <p>Start a conversation with Aditi...</p>
+      </div>
+    )}
     {messages.map(msg => (
-      <div 
-        key={msg.id} 
-        className={`flex w-full items-start gap-3 ${
+      <div
+        key={msg.id}
+        className={`flex w-full items-start gap-3 animate-fade-in-up ${
           msg.sender === 'user' ? 'flex-row-reverse' : 'items-start'
         }`}
       >
@@ -264,284 +493,10 @@ const ChatView: React.FC<{
         </div>
       </div>
     ))}
-    {isLoading && <TypingIndicator userName={userName} />}
+    {isLoading && <TypingIndicator />}
     <div ref={messagesEndRef} />
   </div>
 );
-
-// Call View Component with Real Voice
-const CallView: React.FC<{ userName: string; callDuration: number }> = ({ userName, callDuration }) => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(true);
-  const [userTranscript, setUserTranscript] = useState('');
-  const [aiTranscript, setAiTranscript] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const sessionRef = useRef<any>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
-    const secs = (seconds % 60).toString().padStart(2, '0');
-    return `${minutes}:${secs}`;
-  };
-
-  const handleStartCall = async () => {
-    setIsConnecting(true);
-    setError(null);
-    
-    try {
-      // Get user profile from localStorage
-      const userData = localStorage.getItem('userData');
-      let userProfile = {};
-      
-      if (userData) {
-        try {
-          const parsedData = JSON.parse(userData);
-          userProfile = {
-            name: parsedData.userName || userName,
-            level: parsedData.selectedLevel || 'B2 (Upper-Intermediate)',
-            goals: parsedData.selectedGoals || [],
-            field: parsedData.selectedField || 'Computer Science',
-          };
-        } catch (err) {
-          console.error('Error parsing user data:', err);
-        }
-      }
-
-      const { session, stream } = await startLiveSession(
-        {
-          onMessage: (message: LiveServerMessage) => {
-            // Type guard to ensure serverContent is an object
-            const serverContent = message.serverContent;
-            if (serverContent && typeof serverContent === 'object') {
-              // Handle user transcript (real-time updates)
-              const userText = (serverContent as any).turnComplete?.parts?.[0]?.text;
-              if (userText) {
-                setUserTranscript(userText);
-              }
-
-              // Handle AI transcript (real-time updates during model turn)
-              const aiText = (serverContent as any).modelTurn?.parts?.[0]?.text;
-              if (aiText) {
-                setAiTranscript(aiText);
-              }
-
-              // Handle interrupted state - clear AI transcript when interrupted
-              if ((serverContent as any).interrupted) {
-                // User interrupted, keep the last user transcript visible
-              }
-            }
-          },
-          onError: (err: Error) => {
-            console.error('Session error:', err);
-            setError(err.message);
-            setIsConnected(false);
-          },
-          onClose: () => {
-            setIsConnected(false);
-            setIsConnecting(false);
-          },
-        },
-        userProfile
-      );
-
-      sessionRef.current = session;
-      streamRef.current = stream;
-      setIsConnected(true);
-      setIsConnecting(false);
-      setAiTranscript(`Hi ${userName}! I'm Aditi, your English teacher. How are you doing today? 😊`);
-    } catch (err: any) {
-      console.error('Failed to start call:', err);
-      setError(err.message || 'Failed to connect. Please check your microphone permissions.');
-      setIsConnecting(false);
-    }
-  };
-
-  const handleEndCall = () => {
-    if (sessionRef.current) {
-      try {
-        sessionRef.current.close();
-      } catch (err) {
-        console.error('Error closing session:', err);
-      }
-    }
-    
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
-    
-    setIsConnected(false);
-    setUserTranscript('');
-    setAiTranscript('');
-  };
-
-  const toggleMute = () => {
-    if (streamRef.current) {
-      streamRef.current.getAudioTracks().forEach(track => {
-        track.enabled = !track.enabled;
-      });
-      setIsMuted(!isMuted);
-    }
-  };
-
-  return (
-    <div className="h-full flex flex-col items-center justify-between bg-gradient-to-b from-navy to-navy-hover text-white p-6">
-      {/* Top Section - Avatars and Status */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-6 w-full">
-        {/* Avatars */}
-        <div className="flex items-center justify-center gap-8">
-          <div className="flex flex-col items-center gap-3">
-            <div className="relative">
-              <Avatar className="w-28 h-28 border-4 border-teal shadow-2xl">
-                <AvatarImage 
-                  src="/imgs/Aditi.png" 
-                  className="object-cover"
-                />
-                <AvatarFallback>AD</AvatarFallback>
-              </Avatar>
-              {isConnected && (
-                <div className="absolute -bottom-2 -right-2 bg-white p-2 rounded-full animate-pulse">
-                  <Mic className="h-4 w-4 text-teal" />
-                </div>
-              )}
-            </div>
-            <p className="font-bold text-base font-body">Aditi</p>
-          </div>
-          
-          <div className="flex flex-col items-center gap-3">
-            <div className="relative">
-              <Avatar className="w-28 h-28 border-4 border-coral/50 shadow-2xl">
-                <AvatarFallback className="bg-coral text-white font-bold text-4xl">
-                  {userName.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              {isConnected && !isMuted && (
-                <div className="absolute -bottom-2 -right-2 bg-white p-2 rounded-full animate-pulse">
-                  <Mic className="h-4 w-4 text-coral" />
-                </div>
-              )}
-            </div>
-            <p className="font-bold text-base font-body">{userName}</p>
-          </div>
-        </div>
-
-        {/* Status Message */}
-        {!isConnected && !isConnecting && !error && (
-          <p className="text-white/70 text-center font-body text-sm">
-            Ready to practice English?<br/>Tap the call button to start.
-          </p>
-        )}
-
-        {isConnecting && (
-          <p className="text-white/90 text-center font-body text-sm animate-pulse">
-            Connecting to Aditi...
-          </p>
-        )}
-
-        {error && (
-          <Card className="bg-error/10 border-error/30 rounded-[16px] p-4 max-w-sm">
-            <p className="text-error text-sm text-center font-body">{error}</p>
-          </Card>
-        )}
-
-        {/* Live Transcripts - Closed Captions */}
-        {isConnected && showTranscript && (
-          <Card className="w-full max-w-md bg-black/40 backdrop-blur-md border-white/20 rounded-[16px] animate-fade-in-up">
-            <CardContent className="p-4 space-y-3">
-              {/* AI Transcript */}
-              <div className="space-y-1">
-                <p className="text-xs text-teal font-semibold">Aditi:</p>
-                <p className="text-sm text-white/90 font-body leading-relaxed">
-                  {aiTranscript || <span className="text-white/50 italic">Listening...</span>}
-                </p>
-              </div>
-              
-              {/* Divider */}
-              <div className="border-t border-white/10"></div>
-              
-              {/* User Transcript */}
-              <div className="space-y-1">
-                <p className="text-xs text-coral font-semibold">You:</p>
-                <p className="text-sm text-white/90 font-body leading-relaxed">
-                  {userTranscript || <span className="text-white/50 italic">Speak to see your transcript...</span>}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-      
-      {/* Bottom Section - Action Buttons */}
-      <div className="flex justify-center items-center gap-6 w-full pb-4">
-        {/* Transcript Toggle */}
-        <button 
-          onClick={() => setShowTranscript(!showTranscript)}
-          className="flex flex-col items-center gap-1.5 text-white/80 hover:text-white transition-colors"
-        >
-          <div className={`h-14 w-14 rounded-[16px] flex items-center justify-center shadow-sm transition-all ${
-            showTranscript ? 'bg-white/20' : 'bg-white/10 hover:bg-white/15'
-          }`}>
-            <Captions className="h-6 w-6" />
-          </div>
-          <span className="text-xs font-semibold font-body">CC</span>
-        </button>
-        
-        {/* Main Call Button */}
-        {!isConnected ? (
-          <button 
-            onClick={handleStartCall}
-            disabled={isConnecting}
-            className="flex flex-col items-center gap-1.5 text-white transition-colors disabled:opacity-50"
-          >
-            <div className="h-20 w-20 bg-success text-white rounded-full flex items-center justify-center shadow-lg hover:bg-success/90 transition-all transform hover:scale-105 disabled:hover:scale-100">
-              <Phone className="h-8 w-8" />
-            </div>
-            <span className="text-xs font-semibold font-body">
-              {isConnecting ? 'Connecting...' : 'Start Call'}
-            </span>
-          </button>
-        ) : (
-          <button 
-            onClick={isMuted ? toggleMute : handleEndCall}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              toggleMute();
-            }}
-            className="flex flex-col items-center gap-1.5 text-white transition-colors"
-          >
-            <div className={`h-20 w-20 rounded-full flex items-center justify-center shadow-lg transition-all transform hover:scale-105 ${
-              isMuted ? 'bg-coral' : 'bg-error hover:bg-error/90'
-            }`}>
-              {isMuted ? <MicOff className="h-8 w-8" /> : <Phone className="h-8 w-8" />}
-            </div>
-            <span className="text-xs font-semibold font-body">
-              {isMuted ? 'Unmute' : 'End Call'}
-            </span>
-          </button>
-        )}
-        
-        {/* Mute Toggle (only show when connected) */}
-        {isConnected && (
-          <button 
-            onClick={toggleMute}
-            className="flex flex-col items-center gap-1.5 text-white/80 hover:text-white transition-colors"
-          >
-            <div className={`h-14 w-14 rounded-[16px] flex items-center justify-center shadow-sm transition-all ${
-              isMuted ? 'bg-error/30' : 'bg-white/10 hover:bg-white/15'
-            }`}>
-              {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-            </div>
-            <span className="text-xs font-semibold font-body">
-              {isMuted ? 'Muted' : 'Mute'}
-            </span>
-          </button>
-        )}
-      </div>
-    </div>
-  );
-};
 
 // Message Avatar Component
 const MessageAvatar: React.FC<{ sender: MessageSender; userName: string }> = ({ sender, userName }) => {
@@ -553,7 +508,7 @@ const MessageAvatar: React.FC<{ sender: MessageSender; userName: string }> = ({ 
       </Avatar>
     );
   }
-  
+
   return (
     <Avatar className="w-8 h-8 self-end flex-shrink-0">
       <AvatarFallback className="bg-coral text-white font-bold text-base">
@@ -563,71 +518,102 @@ const MessageAvatar: React.FC<{ sender: MessageSender; userName: string }> = ({ 
   );
 };
 
-// Message Bubble Component
-const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
+// Message Bubble Component with Keyword Highlighting
+const MessageBubble: React.FC<{ message: AditiMessage }> = ({ message }) => {
   const isUser = message.sender === 'user';
   const [showTranslation, setShowTranslation] = useState(false);
-  
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+
+  // Parse **keywords** for highlighting
+  const renderText = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        const keyword = part.slice(2, -2);
+        return (
+          <strong key={index} className="text-indigo-700 font-bold">
+            {keyword}
+          </strong>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
+  const handlePlayAudio = async () => {
+    if (message.audioBase64 && !isPlayingAudio) {
+      setIsPlayingAudio(true);
+      try {
+        await playAudioFromBase64(message.audioBase64);
+      } catch (err) {
+        console.error('Audio playback failed:', err);
+      } finally {
+        setIsPlayingAudio(false);
+      }
+    }
+  };
+
   return (
-    <Card className={`shadow-sm ${
-      isUser 
-        ? 'bg-navy text-white rounded-[20px] rounded-br-lg border-0' 
+    <Card className={`shadow-md transition-all ${
+      isUser
+        ? 'bg-navy text-white rounded-[20px] rounded-br-lg border-0'
         : 'bg-white text-text-primary rounded-[20px] rounded-bl-lg border border-gray-200'
     }`}>
-      <CardContent className="p-3">
-        {message.teachingBadge && (
-          <Badge className="inline-flex items-center gap-1.5 bg-gold/10 text-gold hover:bg-gold/10 border-0 px-2.5 py-1 rounded-full text-xs font-bold mb-2">
-            <Sparkles className="h-3 w-3" /> {message.teachingBadge}
-          </Badge>
-        )}
-        
-        <p 
-          className="text-sm leading-relaxed font-body" 
-          dangerouslySetInnerHTML={{ __html: message.text }} 
-        />
+      <CardContent className="p-4">
+        <p className="text-[15px] leading-relaxed font-body mb-2">
+          {renderText(message.text)}
+        </p>
 
-        <div className="flex items-center gap-3 mt-2">
-          <Button 
-            variant="ghost" 
+        <div className="flex items-center gap-2 mt-3">
+          <Button
+            variant="ghost"
             size="icon"
-            className={`h-7 w-7 rounded-full transition-colors ${
-              isUser 
-                ? 'bg-white/20 hover:bg-white/30 text-white' 
-                : 'bg-gray-200 hover:bg-gray-300 text-text-primary'
-            }`}
-            aria-label="Listen"
+            onClick={handlePlayAudio}
+            disabled={!message.audioBase64 || isPlayingAudio}
+            className={`h-8 w-8 rounded-full transition-all ${
+              isUser
+                ? 'bg-white/20 hover:bg-white/30 text-white'
+                : 'bg-teal/10 hover:bg-teal/20 text-teal'
+            } disabled:opacity-40`}
+            aria-label="Listen to message"
+            title={isPlayingAudio ? 'Playing...' : 'Listen to message'}
           >
-            <Volume2 className="h-4 w-4" />
+            <Volume2 className={`h-4 w-4 ${isPlayingAudio ? 'animate-pulse' : ''}`} />
           </Button>
-          
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={() => message.translation && setShowTranslation(!showTranslation)}
-            className={`h-7 w-7 rounded-full transition-colors ${
-              isUser 
-                ? showTranslation 
-                  ? 'bg-white/30 hover:bg-white/40 text-white' 
-                  : 'bg-white/20 hover:bg-white/30 text-white'
-                : showTranslation
-                  ? 'bg-gray-300 hover:bg-gray-400 text-text-primary'
-                  : 'bg-gray-200 hover:bg-gray-300 text-text-primary'
-            }`}
-            aria-label="Toggle Translation"
-            disabled={!message.translation}
-          >
-            <Languages className="h-4 w-4" />
-          </Button>
-          
-          <span className="text-xs ml-auto opacity-70 font-body">{message.time}</span>
+
+          {message.translation && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowTranslation(!showTranslation)}
+              className={`h-8 w-8 rounded-full transition-all ${
+                isUser
+                  ? showTranslation
+                    ? 'bg-white/30 hover:bg-white/40 text-white'
+                    : 'bg-white/20 hover:bg-white/30 text-white'
+                  : showTranslation
+                    ? 'bg-navy/20 hover:bg-navy/30 text-navy'
+                    : 'bg-navy/10 hover:bg-navy/20 text-navy'
+              }`}
+              aria-label="Toggle Translation"
+              title={showTranslation ? 'Hide translation' : 'Show translation'}
+            >
+              <Languages className="h-4 w-4" />
+            </Button>
+          )}
+
+          <span className="text-[11px] ml-auto opacity-60 font-body font-medium">{message.time}</span>
         </div>
 
         {message.translation && showTranslation && (
-          <div className="mt-2 pt-2 border-t border-gray-200/50 animate-fade-in-down">
-            <p className="text-xs font-semibold opacity-70 mb-1 font-body">
+          <div className={`mt-3 pt-3 animate-fade-in-down ${
+            isUser ? 'border-t border-white/20' : 'border-t border-gray-200'
+          }`}>
+            <p className="text-xs font-semibold opacity-70 mb-1.5 font-body">
               {message.translation.language}
             </p>
-            <p className="text-sm opacity-90 italic font-body">
+            <p className="text-sm opacity-90 italic font-body leading-relaxed">
               &quot;{message.translation.text}&quot;
             </p>
           </div>
@@ -638,33 +624,40 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
 };
 
 // Feedback Section Component
-const FeedbackSection: React.FC<{ feedback: Message['feedback'] }> = ({ feedback }) => {
+const FeedbackSection: React.FC<{ feedback: AditiMessage['feedback'] }> = ({ feedback }) => {
   const [isOpen, setIsOpen] = useState(false);
   if (!feedback) return null;
 
   return (
     <>
-      <div className="w-full flex justify-end mt-1.5">
-        <Button 
-          onClick={() => setIsOpen(!isOpen)} 
+      <div className="w-full flex justify-end mt-2">
+        <Button
+          onClick={() => setIsOpen(!isOpen)}
           variant="ghost"
-          className="text-sm font-semibold text-teal hover:text-teal-hover flex items-center gap-1 transition-colors h-auto p-1 hover:bg-transparent"
+          className="text-sm font-semibold text-teal hover:text-teal-hover flex items-center gap-1.5 transition-all h-auto px-3 py-1.5 hover:bg-teal/10 rounded-full"
         >
+          <Star className="h-4 w-4 text-gold fill-gold" />
           <span className="font-body">{isOpen ? 'Hide Feedback' : 'View Feedback'}</span>
-          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </Button>
       </div>
-      
+
       {isOpen && (
-        <Card className="w-full mt-2 border-gray-200 rounded-[16px] shadow-sm animate-fade-in-down">
+        <Card className="w-full mt-2 border-2 border-teal/20 rounded-[16px] shadow-md animate-fade-in-down bg-gradient-to-br from-white to-teal/5">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-teal font-bold mb-3 font-body">
-              <Star className="h-4 w-4 text-gold fill-current" />
+            <div className="flex items-center gap-2 text-teal font-bold mb-3 font-body text-base">
+              <Star className="h-5 w-5 text-gold fill-gold" />
               <span>{feedback.grade}</span>
             </div>
-            <div className="space-y-2 text-text-secondary text-sm font-body">
-              <p dangerouslySetInnerHTML={{ __html: feedback.original }} />
-              <p dangerouslySetInnerHTML={{ __html: feedback.corrected }} />
+            <div className="space-y-3 text-text-secondary text-sm font-body">
+              <div>
+                <p className="text-xs font-semibold text-text-primary mb-1">Your message:</p>
+                <p className="leading-relaxed" dangerouslySetInnerHTML={{ __html: feedback.original }} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-text-primary mb-1">Improved version:</p>
+                <p className="leading-relaxed" dangerouslySetInnerHTML={{ __html: feedback.corrected }} />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -674,7 +667,7 @@ const FeedbackSection: React.FC<{ feedback: Message['feedback'] }> = ({ feedback
 };
 
 // Typing Indicator Component
-const TypingIndicator: React.FC<{ userName: string }> = ({ userName }) => (
+const TypingIndicator: React.FC = () => (
   <div className="flex w-full items-start gap-3 justify-start animate-fade-in-up">
     <Avatar className="w-8 h-8 self-end flex-shrink-0">
       <AvatarImage src="/imgs/Aditi.png" />
