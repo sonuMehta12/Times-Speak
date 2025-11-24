@@ -4,6 +4,7 @@ import "./globals.css";
 import ConditionalLayout from "@/components/ConditionalLayout";
 import OnboardingWrapper from "@/components/OnboardingWrapper";
 import { LessonProvider } from "@/lib/context/LessonContext";
+import "@/lib/utils/debug-helpers"; // Load debug helpers for development
 
 const inter = Inter({
   subsets: ["latin"],

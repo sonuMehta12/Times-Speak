@@ -1,6 +1,6 @@
 // lib/utils/progress.ts
 
-import { UserProgress, UnitProgress, LessonProgress, Lesson } from "@/lib/types/language";
+import { UserProgress, UnitProgress, LessonProgress, Lesson, ActivityEntry } from "@/lib/types/language";
 import { UNITS_DATA } from "@/lib/data/units";
 
 const STORAGE_KEY = "languageLearningProgress";
@@ -31,6 +31,9 @@ export function initializeProgress(): UserProgress {
     longestStreak: 0,
     lastActiveDate: new Date().toISOString().split("T")[0],
     badges: [],
+    activityLog: {},
+    dailyGoalMinutes: 10,
+    weeklyGoalDays: 7,
   };
 }
 
@@ -306,4 +309,153 @@ export function isStepComplete(
 ): boolean {
   const lessonProgress = progress.units[unitId]?.lessonsProgress[lessonId];
   return lessonProgress?.steps[step] === true;
+}
+/**
+ * Get today's date in YYYY-MM-DD format
+ */
+export function getTodayDate(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+/**
+ * Get activity entry for a specific date
+ */
+export function getActivityForDate(
+  progress: UserProgress,
+  date: string
+): ActivityEntry | null {
+  return progress.activityLog[date] || null;
+}
+
+/**
+ * Get today's activity
+ */
+export function getTodayActivity(progress: UserProgress): ActivityEntry {
+  const today = getTodayDate();
+  return progress.activityLog[today] || {
+    date: today,
+    minutesSpent: 0,
+    activitiesCompleted: [],
+    lessonsCount: 0,
+    quizzesCount: 0,
+    roleplaysCount: 0,
+    xpEarned: 0,
+  };
+}
+
+/**
+ * Record activity for today
+ */
+export function recordActivity(
+  progress: UserProgress,
+  activityId: string,
+  activityType: 'lesson' | 'quiz' | 'roleplay',
+  minutesSpent: number,
+  xpEarned: number
+): UserProgress {
+  const today = getTodayDate();
+  const currentActivity = getTodayActivity(progress);
+
+  const updatedActivity: ActivityEntry = {
+    ...currentActivity,
+    minutesSpent: currentActivity.minutesSpent + minutesSpent,
+    activitiesCompleted: [...currentActivity.activitiesCompleted, activityId],
+    lessonsCount: currentActivity.lessonsCount + (activityType === 'lesson' ? 1 : 0),
+    quizzesCount: currentActivity.quizzesCount + (activityType === 'quiz' ? 1 : 0),
+    roleplaysCount: currentActivity.roleplaysCount + (activityType === 'roleplay' ? 1 : 0),
+    xpEarned: currentActivity.xpEarned + xpEarned,
+  };
+
+  return {
+    ...progress,
+    activityLog: {
+      ...progress.activityLog,
+      [today]: updatedActivity,
+    },
+  };
+}
+
+/**
+ * Get last 7 days of activity
+ */
+export function getLast7Days(progress: UserProgress): ActivityEntry[] {
+  const days: ActivityEntry[] = [];
+  const today = new Date();
+
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split("T")[0];
+
+    const activity = progress.activityLog[dateStr] || {
+      date: dateStr,
+      minutesSpent: 0,
+      activitiesCompleted: [],
+      lessonsCount: 0,
+      quizzesCount: 0,
+      roleplaysCount: 0,
+      xpEarned: 0,
+    };
+
+    days.push(activity);
+  }
+
+  return days;
+}
+
+/**
+ * Get weekly goal progress (days with activity in last 7 days)
+ */
+export function getWeeklyGoalProgress(progress: UserProgress): {
+  current: number;
+  target: number;
+  percentage: number;
+} {
+  const last7Days = getLast7Days(progress);
+  const daysWithActivity = last7Days.filter(day => day.minutesSpent > 0).length;
+
+  return {
+    current: daysWithActivity,
+    target: progress.weeklyGoalDays,
+    percentage: Math.round((daysWithActivity / progress.weeklyGoalDays) * 100),
+  };
+}
+
+/**
+ * Get daily goal progress (minutes spent today)
+ */
+export function getDailyGoalProgress(progress: UserProgress): {
+  current: number;
+  target: number;
+  percentage: number;
+  isComplete: boolean;
+} {
+  const todayActivity = getTodayActivity(progress);
+  const percentage = Math.min(
+    Math.round((todayActivity.minutesSpent / progress.dailyGoalMinutes) * 100),
+    100
+  );
+
+  return {
+    current: todayActivity.minutesSpent,
+    target: progress.dailyGoalMinutes,
+    percentage,
+    isComplete: todayActivity.minutesSpent >= progress.dailyGoalMinutes,
+  };
+}
+
+/**
+ * Migrate old progress to include new fields
+ */
+export function migrateProgress(progress: UserProgress): UserProgress {
+  if (!progress.activityLog) {
+    progress.activityLog = {};
+  }
+  if (!progress.dailyGoalMinutes) {
+    progress.dailyGoalMinutes = 10;
+  }
+  if (!progress.weeklyGoalDays) {
+    progress.weeklyGoalDays = 7;
+  }
+  return progress;
 }

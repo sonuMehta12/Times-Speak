@@ -83,11 +83,14 @@ export default function OnboardingPage() {
       lastActiveDate: new Date().toISOString(),
     };
 
+    // Clear any existing learning progress for fresh start
+    localStorage.removeItem('languageLearningProgress');
+    
     // Save to localStorage using the unified profile system
     saveUserProfile(userProfile);
     localStorage.setItem('onboardingCompleted', 'true');
 
-    console.log('Onboarding completed!', userProfile);
+    console.log('Onboarding completed! Starting fresh.', userProfile);
 
     // Navigate to home page
     router.push('/');

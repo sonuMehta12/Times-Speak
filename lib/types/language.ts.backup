@@ -107,19 +107,6 @@ export interface UnitProgress {
 }
 
 /**
- * Activity entry for a specific day
- */
-export interface ActivityEntry {
-  date: string; // ISO date string (YYYY-MM-DD)
-  minutesSpent: number;
-  activitiesCompleted: string[]; // lesson IDs, quiz IDs, roleplay IDs
-  lessonsCount: number;
-  quizzesCount: number;
-  roleplaysCount: number;
-  xpEarned: number;
-}
-
-/**
  * Represents overall user learning progress (Enhanced)
  */
 export interface UserProgress {
@@ -130,9 +117,6 @@ export interface UserProgress {
   longestStreak: number;
   lastActiveDate: string;
   badges: string[];
-  activityLog: Record<string, ActivityEntry>; // date string -> activity data
-  dailyGoalMinutes: number; // default: 10
-  weeklyGoalDays: number; // default: 7
 }
 
 /**

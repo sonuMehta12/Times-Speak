@@ -16,6 +16,8 @@ import {
   awardBadge,
   getLessonById,
   calculateProgress,
+  recordActivity,
+  migrateProgress,
 } from "@/lib/utils/progress";
 
 interface LessonContextType {
@@ -55,7 +57,10 @@ export function LessonProvider({ children }: { children: React.ReactNode }) {
     // Initialize from localStorage or create new
     if (typeof window !== "undefined") {
       const saved = loadProgress();
-      return saved || initializeProgress();
+      if (saved) {
+        return migrateProgress(saved); // Migrate old progress to new schema
+      }
+      return initializeProgress();
     }
     return initializeProgress();
   });
@@ -127,6 +132,9 @@ export function LessonProvider({ children }: { children: React.ReactNode }) {
       // Award XP
       updated = awardXP(updated, 20);
 
+      // Record activity (estimate 3 minutes for lesson)
+      updated = recordActivity(updated, `${unitId}_${lessonId}_lesson`, 'lesson', 3, 20);
+
       // Check for first lesson badge
       if (lessonId === "l1" && !prev.badges.includes("first_lesson")) {
         updated = awardBadge(updated, "first_lesson");
@@ -180,6 +188,9 @@ export function LessonProvider({ children }: { children: React.ReactNode }) {
       // Award XP
       updated = awardXP(updated, xpAmount);
 
+      // Record activity (estimate 2 minutes for quiz)
+      updated = recordActivity(updated, `${unitId}_${lessonId}_quiz`, 'quiz', 2, xpAmount);
+
       // Check for quiz master badge (100% on any quiz)
       if (score === 100 && !prev.badges.includes("quiz_master")) {
         updated = awardBadge(updated, "quiz_master");
@@ -230,6 +241,9 @@ export function LessonProvider({ children }: { children: React.ReactNode }) {
 
       // Award XP
       updated = awardXP(updated, 20);
+
+      // Record activity (estimate 5 minutes for roleplay)
+      updated = recordActivity(updated, `${unitId}_${lessonId}_roleplay`, 'roleplay', 5, 20);
 
       // Check for conversation starter badge (first roleplay)
       if (lessonId === "l1" && !prev.badges.includes("conversation_starter")) {
