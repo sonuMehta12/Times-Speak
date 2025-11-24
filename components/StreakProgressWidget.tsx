@@ -93,49 +93,14 @@ export default function StreakProgressWidget({
         {/* Header Row - Filter & Points */}
         <div className="flex items-center justify-between mb-3">
           {/* Time Filter Dropdown */}
-          <div className="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="h-7 px-2.5 rounded-[10px] border-gray-200 bg-white hover:bg-gray-50 text-text-secondary font-medium text-xs flex items-center gap-1.5"
-            >
-              Last {timeFilter} Days
-              <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
-            </Button>
-
-            {isDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 w-32 bg-white rounded-[12px] shadow-lg border border-gray-200 py-1 z-10">
-                <button
-                  onClick={() => { setTimeFilter('7'); setIsDropdownOpen(false); }}
-                  className="w-full px-3 py-1.5 text-left text-xs hover:bg-gray-50 text-text-primary font-medium"
-                >
-                  Last 7 Days
-                </button>
-                <button
-                  onClick={() => { setTimeFilter('30'); setIsDropdownOpen(false); }}
-                  className="w-full px-3 py-1.5 text-left text-xs hover:bg-gray-50 text-text-secondary"
-                >
-                  Last 30 Days
-                </button>
-                <button
-                  onClick={() => { setTimeFilter('90'); setIsDropdownOpen(false); }}
-                  className="w-full px-3 py-1.5 text-left text-xs hover:bg-gray-50 text-text-secondary"
-                >
-                  Last 90 Days
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* XP Display */}
-          <div className="bg-gradient-to-br from-teal/20 to-teal/10 rounded-[12px] px-3 py-1.5 border border-teal/30 flex items-center gap-2">
+          {/* <div className="bg-gradient-to-br from-teal/20 to-teal/10 rounded-[12px] px-3 py-1.5 border border-teal/30 flex items-center gap-2">
             <Trophy className="h-4 w-4 text-teal flex-shrink-0" />
             <div className="flex items-baseline gap-1">
               <span className="text-xs text-text-secondary font-medium">Total XP</span>
               <span className="text-base font-bold text-navy">{userPoints.toLocaleString()}</span>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Streak Section */}

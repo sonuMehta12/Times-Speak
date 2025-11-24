@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Lock, Star, Target, Trophy } from 'lucide-react';
+import { Check, Lock, Star, Target, Trophy, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -74,10 +74,11 @@ const getStatusColors = (status: LessonStatus) => {
 interface ActiveLessonCardProps {
   node: Node;
   onStart: () => void;
+  onClose: () => void;
   isLeft: boolean;
 }
 
-const ActiveLessonCard: React.FC<ActiveLessonCardProps> = ({ node, onStart, isLeft }) => {
+const ActiveLessonCard: React.FC<ActiveLessonCardProps> = ({ node, onStart, onClose, isLeft }) => {
   const getButtonText = () => {
     if (node.type === 'final-quiz') return 'Start Final Quiz';
     if (node.type === 'final-roleplay') return 'Start Final Roleplay';
@@ -90,13 +91,6 @@ const ActiveLessonCard: React.FC<ActiveLessonCardProps> = ({ node, onStart, isLe
   const horizontalPosition = isLeft
     ? 'left-0 ml-2'  // Card on left edge
     : 'right-0 mr-2'; // Card on right edge
-
-  // Notch connects card to node - positioned on the side CLOSEST to the node
-  // For LEFT nodes: notch on RIGHT side (toward the left node)
-  // For RIGHT nodes: notch on LEFT side (toward the right node)
-  const arrowHorizontalPosition = isLeft ? 'right-0 translate-x-1/2' : 'left-0 -translate-x-1/2';
-  const arrowRotation = isLeft ? '-rotate-45' : 'rotate-45';
-  const arrowBorders = isLeft ? 'border-b-2 border-r-2' : 'border-t-2 border-l-2';
 
   // Format phrase to show fill-in-the-blank style
   const formatPhraseWithBlanks = (phrase: string) => {
@@ -112,10 +106,16 @@ const ActiveLessonCard: React.FC<ActiveLessonCardProps> = ({ node, onStart, isLe
   return (
     <div className={`absolute top-[60px] ${horizontalPosition} w-[min(260px,calc(100vw-100px))] z-30 animate-fade-in`}>
       <Card className="relative bg-white rounded-2xl shadow-2xl border-2 border-gold/30">
-        {/* Arrow/Notch pointing to the node - positioned on the side facing the node */}
-        <div className={`absolute ${arrowHorizontalPosition} top-2 w-3 h-3 bg-white transform ${arrowRotation} ${arrowBorders} border-gold/30 z-10`}></div>
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-100 transition-colors z-10"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+        </button>
 
-        <CardContent className="p-4">
+        <CardContent className="p-4 pt-8">
           {/* Header: Lesson tag + XP */}
           <div className="flex items-center justify-between mb-3">
             <Badge variant="outline" className="border-coral/30 bg-coral/10 text-coral rounded-md px-2 py-0.5 text-xs font-semibold">
@@ -367,6 +367,7 @@ export default function LearningPath() {
                   <ActiveLessonCard
                     node={node}
                     onStart={() => handleStartNode(node)}
+                    onClose={() => setActiveNodeId(null)}
                     isLeft={isLeft}
                   />
                 )}
