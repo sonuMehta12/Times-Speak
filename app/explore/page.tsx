@@ -51,51 +51,11 @@ export default function ExplorePage() {
   return (
     <div className="w-full">
       <main className="pb-6 bg-bg-primary min-h-screen">
-        {/* Featured Section */}
-        <section className="mb-8 animate-fade-in-up">
-          <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {featuredScenarios.map((scenario) => (
-              <RolePlayCard
-                key={scenario.id}
-                scenario={scenario}
-                onSelect={handleSelectScenario}
-                variant="featured"
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* Create Custom Card */}
-        <div className="px-4">
-        <Card
-          className="mb-8 animate-fade-in-up border-2 border-dashed border-gold/30 hover:border-gold hover:shadow-md transition-all duration-300 cursor-pointer rounded-[24px] overflow-hidden bg-gradient-to-br from-gold/5 to-navy/5"
-          style={{ animationDelay: "100ms" }}
-        >
-          <CardContent className="p-6 text-center">
-            <div className="w-16 h-16 rounded-[16px] bg-gradient-to-br from-gold to-navy flex items-center justify-center mx-auto mb-4">
-              <Zap className="h-8 w-8 text-white" />
-            </div>
-            <h3 className="font-display text-base font-bold text-navy mb-2">
-              Create Custom Scenario
-            </h3>
-            <p className="text-sm text-text-secondary mb-4">
-              Design your own role-play with AI assistance
-            </p>
-            <Button className="bg-navy text-white hover:bg-navy/90 rounded-[16px] font-semibold h-11">
-              Get Started
-            </Button>
-          </CardContent>
-        </Card>
-        </div>
-
         {/* Categories Section */}
         <section
           className="mb-6 animate-fade-in-up"
           style={{ animationDelay: "150ms" }}
         >
-          <h2 className="font-display text-lg font-bold text-navy mb-4 px-4">
-            Categories
-          </h2>
           <div className="flex gap-3 overflow-x-auto pb-4 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {categories.map((cat) => {
               const Icon = cat.icon;
@@ -140,9 +100,9 @@ export default function ExplorePage() {
           className="animate-fade-in-up"
           style={{ animationDelay: "300ms" }}
         >
-          <h2 className="font-display text-lg font-bold text-navy mb-4 px-4">
+          {/* <h2 className="font-display text-lg font-bold text-navy mb-4 px-4">
             {activeCategory === 'all' ? 'All Scenarios' : `${categories.find(c => c.id === activeCategory)?.label} Scenarios`}
-          </h2>
+          </h2> */}
           <div className="grid grid-cols-2 gap-4 px-4">
             {displayedScenarios.map((scenario) => (
               <RolePlayCard

@@ -1,23 +1,15 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Flame, Trophy, ChevronDown, Check, X } from 'lucide-react';
+import React from 'react';
+import { Flame, Check, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
 import { useLessonContext } from '@/lib/context/LessonContext';
 import {
   getLast7Days,
   getDailyGoalProgress,
   getWeeklyGoalProgress
 } from '@/lib/utils/progress';
-import {
-  getHeroMessage,
-  getStreakDisplayText,
-  getStreakBadge,
-  shouldShowGraceWarning,
-  getGracePeriodMessage
-} from '@/lib/utils/hero-messages';
 
 interface DayData {
   day: string;
@@ -33,17 +25,12 @@ interface StreakProgressWidgetProps {
 export default function StreakProgressWidget({
   userName = "there",
 }: StreakProgressWidgetProps) {
-  const [timeFilter, setTimeFilter] = useState<'7' | '30' | '90'>('7');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
   const { userProgress } = useLessonContext();
 
   // Calculate real data from user progress
   const dailyGoal = getDailyGoalProgress(userProgress);
   const weeklyGoal = getWeeklyGoalProgress(userProgress);
   const last7DaysActivities = getLast7Days(userProgress);
-  const streakBadge = getStreakBadge(userProgress.currentStreak);
-  const showGraceWarning = shouldShowGraceWarning(userProgress);
 
   // Transform activity data to day display format
   const last7Days: DayData[] = last7DaysActivities.map((activity) => {
@@ -58,51 +45,10 @@ export default function StreakProgressWidget({
     };
   });
 
-  // Get dynamic hero message (no subtitle - concise hero message only)
-  const heroMessage = getHeroMessage(userProgress, userName);
-  const streakText = getStreakDisplayText(userProgress);
-
-  // For leaderboard (mock for now - can be implemented later)
-  const userRank = 0; // 0 means hide rank for now
-  const userPoints = userProgress.totalXP;
 
   return (
     <Card className="mb-6 border-gray-200 rounded-[24px] shadow-md overflow-hidden animate-fade-in-up">
       <CardContent className="p-4">
-        {/* Hero Message Section - Single concise message only */}
-        <div className="mb-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1">
-              <h2 className="text-lg font-bold text-navy">
-                {heroMessage}
-              </h2>
-              {showGraceWarning && (
-                <p className="text-xs text-coral mt-1 font-medium">
-                  {getGracePeriodMessage(userProgress)}
-                </p>
-              )}
-            </div>
-            {streakBadge && (
-              <div className="flex-shrink-0 bg-gradient-to-br from-gold/20 to-gold/10 rounded-[12px] px-2.5 py-1 border border-gold/30">
-                <span className="text-xs font-bold text-gold">{streakBadge}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Header Row - Filter & Points */}
-        <div className="flex items-center justify-between mb-3">
-          {/* Time Filter Dropdown */}
-          {/* XP Display */}
-          {/* <div className="bg-gradient-to-br from-teal/20 to-teal/10 rounded-[12px] px-3 py-1.5 border border-teal/30 flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-teal flex-shrink-0" />
-            <div className="flex items-baseline gap-1">
-              <span className="text-xs text-text-secondary font-medium">Total XP</span>
-              <span className="text-base font-bold text-navy">{userPoints.toLocaleString()}</span>
-            </div>
-          </div> */}
-        </div>
-
         {/* Streak Section */}
         <div className="flex items-center gap-3 mb-3">
           {/* Streak Icon & Number */}
@@ -137,7 +83,6 @@ export default function StreakProgressWidget({
             <div className="grid grid-cols-7 gap-1.5">
               {last7Days.map((dayData, index) => {
                 const isToday = index === 6;
-                const isSkipped = !dayData.completed && !isToday;
 
                 return (
                   <div key={index} className="flex flex-col items-center">

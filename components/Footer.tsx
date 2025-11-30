@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, BookOpen, Compass, User } from "lucide-react";
+import { Home, Compass, User, BookOpen } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Footer() {
@@ -13,6 +13,7 @@ export default function Footer() {
     { href: "/", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: Compass },
     { href: "/aditi", label: "Aditi", icon: null, isAI: true }, // Special AI tutor item
+    { href: "/learn", label: "Learn", icon: BookOpen },
     { href: "/profile", label: "Profile", icon: User },
   ];
 

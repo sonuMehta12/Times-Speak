@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Volume2, Mic, MoreVertical, Star, RotateCw } from 'lucide-react';
+import { ArrowLeft, Volume2, MoreVertical, Star, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useLessonContext } from "@/lib/context/LessonContext";
 import { Lesson } from "@/lib/types/language";
 import Image from 'next/image';
+import VoiceRecorder from '@/components/common/VoiceRecorder';
 
 interface Props {
   lesson: Lesson;
@@ -24,14 +25,11 @@ export default function LessonClient({ lesson, unitId, lessonNumber, totalLesson
   // States
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentCaption, setCurrentCaption] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
   const [hasRecorded, setHasRecorded] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [speechSupported, setSpeechSupported] = useState(false);
   const [accuracyScore, setAccuracyScore] = useState(0);
 
-  const recognitionRef = useRef<any>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Calculate accuracy score based on transcript vs expected phrase
@@ -103,53 +101,6 @@ export default function LessonClient({ lesson, unitId, lessonNumber, totalLesson
     setCurrentLesson(unitId, lesson.id);
   }, [unitId, lesson.id, setCurrentLesson]);
 
-  // Initialize speech recognition
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-      if (SpeechRecognition) {
-        setSpeechSupported(true);
-        const recognition = new SpeechRecognition();
-
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
-
-        recognition.onstart = () => {
-          setIsRecording(true);
-        };
-
-        recognition.onresult = (event: any) => {
-          const speechResult = event.results[0][0].transcript;
-          setTranscript(speechResult);
-          setHasRecorded(true);
-
-          // Calculate accuracy
-          const accuracy = calculateAccuracy(speechResult, lesson.phrase);
-          setAccuracyScore(accuracy);
-
-          setTimeout(() => {
-            setShowFeedbackModal(true);
-          }, 500);
-        };
-
-        recognition.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error);
-          setIsRecording(false);
-        };
-
-        recognition.onend = () => {
-          setIsRecording(false);
-        };
-
-        recognitionRef.current = recognition;
-      } else {
-        setSpeechSupported(false);
-        console.warn('Speech recognition not supported in this browser');
-      }
-    }
-  }, []);
 
   // Auto-speak the script on mount
   useEffect(() => {
@@ -238,20 +189,17 @@ export default function LessonClient({ lesson, unitId, lessonNumber, totalLesson
     }
   };
 
-  const handleStartRecording = () => {
-    if (!speechSupported) {
-      alert('Speech recognition is not supported in your browser. Please try Chrome or Edge.');
-      return;
-    }
+  const handleRecordingComplete = (speechResult: string) => {
+    setTranscript(speechResult);
+    setHasRecorded(true);
 
-    if (isRecording) {
-      recognitionRef.current?.stop();
-    } else {
-      setTranscript('');
-      setHasRecorded(false);
-      setShowFeedbackModal(false);
-      recognitionRef.current?.start();
-    }
+    // Calculate accuracy
+    const accuracy = calculateAccuracy(speechResult, lesson.phrase);
+    setAccuracyScore(accuracy);
+
+    setTimeout(() => {
+      setShowFeedbackModal(true);
+    }, 500);
   };
 
   const handleContinueFromFeedback = () => {
@@ -266,7 +214,6 @@ export default function LessonClient({ lesson, unitId, lessonNumber, totalLesson
   const handleTryAgain = () => {
     setShowFeedbackModal(false);
     setHasRecorded(false);
-    setIsRecording(false);
     setTranscript('');
     setAccuracyScore(0);
   };
@@ -412,29 +359,16 @@ export default function LessonClient({ lesson, unitId, lessonNumber, totalLesson
                   </Button>
 
                   {/* Speak Now Button */}
-                  <Button
-                    onClick={handleStartRecording}
-                    disabled={!speechSupported}
-                    className={`w-full py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all active:scale-95 ${
-                      isRecording
-                        ? 'bg-error hover:bg-error-hover text-white animate-pulse'
-                        : hasRecorded
-                        ? 'bg-success hover:bg-success-hover text-white'
-                        : speechSupported
-                        ? 'bg-coral hover:bg-coral-hover text-white'
-                        : 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                    }`}
-                  >
-                    <Mic className="w-4 h-4 mr-2" />
-                    {!speechSupported
-                      ? 'Speech Not Supported'
-                      : isRecording
-                      ? 'Listening... (Tap to stop)'
-                      : hasRecorded
-                      ? 'Recorded! Tap to try again'
-                      : 'Speak Now'
-                    }
-                  </Button>
+                  <VoiceRecorder
+                    mode="auto"
+                    onRecordingComplete={handleRecordingComplete}
+                    variant="default"
+                    buttonText={hasRecorded ? "Try Again" : "Speak Now"}
+                    showInterimResults={false}
+                    maxDuration={30}
+                    className="w-full py-3 rounded-xl font-semibold text-sm shadow-md"
+                    onError={(error) => console.error('Voice recording error:', error)}
+                  />
                 </CardContent>
               </Card>
             </div>

@@ -4,10 +4,14 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Check, Play, Loader2 } from 'lucide-react';
+import { Check, Play, Loader2, MessageCircle } from 'lucide-react';
 import MessageBubble from '@/components/common/MessageBubble';
-import { saveUserProfile } from '@/lib/data/user-profile';
-import { UserProfile } from '@/lib/types/roleplay';
+import { saveUserProfile, updateUserProfile } from '@/lib/data/user-profile';
+import { UserProfile, ConversationAnalysis, Message } from '@/lib/types/roleplay';
+import AssessmentChat from '@/components/assessment/AssessmentChat';
+import ResultsBreakdownPage from '@/components/roleplay/ResultsBreakdownPage';
+import { gradeAssessment } from '@/lib/services/assessment-chat';
+import { generatePersonalizedCourse, savePersonalizedCourse } from '@/lib/services/course-generator-client';
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -28,10 +32,15 @@ export default function OnboardingPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationComplete, setGenerationComplete] = useState(false);
 
+  // Assessment state
+  const [assessmentMessages, setAssessmentMessages] = useState<any[]>([]);
+  const [assessmentResult, setAssessmentResult] = useState<ConversationAnalysis | null>(null);
+  const [isGradingAssessment, setIsGradingAssessment] = useState(false);
+
   // Validation errors
   const [nameError, setNameError] = useState('');
 
-  const totalSteps = 16;
+  const totalSteps = 20; // Updated to include assessment flow steps
   const progress = (step / totalSteps) * 100;
 
   const handleNext = () => {
@@ -96,12 +105,119 @@ export default function OnboardingPage() {
     router.push('/');
   };
 
-  // Simulate AI roadmap generation
-  const handleGenerateRoadmap = () => {
+  // Handle assessment completion
+  const handleAssessmentComplete = async (messages: any[]) => {
+    setAssessmentMessages(messages);
+    setIsGradingAssessment(true);
+    setStep(17); // Auto-advance to grading loader
+
+    try {
+      // Build user profile for assessment
+      const userProfile: UserProfile = {
+        name: userName,
+        level: englishLevel === 'beginner' ? 'A2' : englishLevel === 'intermediate' ? 'B1' : englishLevel === 'advanced' ? 'C1' : 'C2',
+        nativeLanguage: 'Hinglish (हिन्दी)',
+        learningGoals: primaryGoal,
+        challenges: {
+          primary: whatStopsYou,
+          conversation: hardestPart,
+        },
+        challengesContext: `${userName} is learning English to ${primaryGoal.join(', ')}.`,
+        gender,
+        ageRange,
+        currentStatus,
+        interestedField,
+        primaryGoal,
+        whatStopsYou,
+        fearOfSpeaking,
+        hardestPart,
+        feelingWhenSpeak,
+        englishLevel,
+      };
+
+      // Convert assessment messages to Message format for grading
+      const messagesToGrade: Message[] = messages.map((msg, idx) => ({
+        id: String(idx),
+        role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
+        content: msg.text,
+        timestamp: Date.now(),
+      }));
+
+      // Grade the assessment
+      const result = await gradeAssessment(userProfile, messagesToGrade);
+      setAssessmentResult(result);
+      setIsGradingAssessment(false);
+      setStep(18); // Auto-advance to results
+    } catch (error) {
+      console.error('Assessment grading failed:', error);
+      setIsGradingAssessment(false);
+      setStep(18); // Still advance with fallback
+    }
+  };
+
+  // Real AI course generation (replaces fake simulation)
+  const handleGenerateRoadmap = async () => {
     setIsGenerating(true);
 
-    // Simulate AI processing with stages
-    setTimeout(() => setGenerationComplete(true), 4000);
+    try {
+      // Build complete user profile
+      const userProfile: UserProfile = {
+        name: userName,
+        level: englishLevel === 'beginner' ? 'A2' : englishLevel === 'intermediate' ? 'B1' : englishLevel === 'advanced' ? 'C1' : 'C2',
+        nativeLanguage: 'Hinglish (हिन्दी)',
+        learningGoals: primaryGoal,
+        challenges: {
+          primary: whatStopsYou,
+          conversation: hardestPart,
+        },
+        challengesContext: `${userName} is learning English to ${primaryGoal.join(', ')}. Main challenges include: ${whatStopsYou.join(', ')}. When speaking, they feel: ${feelingWhenSpeak}.`,
+        gender,
+        ageRange,
+        currentStatus,
+        interestedField,
+        primaryGoal,
+        whatStopsYou,
+        fearOfSpeaking,
+        hardestPart,
+        feelingWhenSpeak,
+        englishLevel,
+        joinDate: new Date().toISOString(),
+        currentStreak: 0,
+        totalTimeMinutes: 0,
+        roleplayCompleted: 0,
+        lastActiveDate: new Date().toISOString(),
+        assessmentResult: assessmentResult || undefined,
+        assessmentCompletedAt: assessmentResult ? new Date().toISOString() : undefined,
+        hasPersonalizedCourse: true,
+        courseGeneratedAt: new Date().toISOString(),
+      };
+
+      if (!assessmentResult) {
+        console.warn('No assessment result available for course generation');
+        // Fallback to fake delay if no assessment
+        setTimeout(() => setGenerationComplete(true), 4000);
+        return;
+      }
+
+      // Generate personalized course using AI (1 unit with 7 lessons)
+      const course = await generatePersonalizedCourse({
+        userData: userProfile,
+        assessmentResult: assessmentResult,
+        targetUnits: 1,  // Changed from 7 - we now generate 1 unit with 7 lessons
+      });
+
+      // Save course to localStorage
+      savePersonalizedCourse(course);
+
+      // Save updated user profile with assessment data
+      saveUserProfile(userProfile);
+
+      setGenerationComplete(true);
+    } catch (error) {
+      console.error('Course generation failed:', error);
+      // Still mark as complete even if generation fails (will use default units)
+      setTimeout(() => setGenerationComplete(true), 2000);
+    }
   };
 
   const renderStep = () => {
@@ -700,8 +816,158 @@ export default function OnboardingPage() {
           </div>
         );
 
-      // Step 15: AI Personalization Loader
+      // Step 15: Assessment Introduction
       case 15:
+        return (
+          <div className="space-y-6">
+            <div className="text-center space-y-3">
+              <div className="text-5xl mb-2">🎯</div>
+              <h2 className="text-2xl font-bold text-navy font-display">
+                Let's Check Your Skills
+              </h2>
+              <p className="text-sm text-text-secondary font-body">
+                Quick 2-minute conversation to understand your current level better
+              </p>
+            </div>
+
+            <Card className="border-2 border-teal/20 bg-gradient-to-br from-teal/5 to-white rounded-[24px] shadow-sm">
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-teal/10 flex items-center justify-center">
+                    <MessageCircle className="h-5 w-5 text-teal" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-navy mb-1 font-body">What to Expect</h3>
+                    <ul className="text-sm text-text-secondary space-y-2 font-body">
+                      <li className="flex items-start gap-2">
+                        <Check className="h-4 w-4 text-teal mt-0.5 flex-shrink-0" />
+                        <span>5 friendly conversation questions</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Check className="h-4 w-4 text-teal mt-0.5 flex-shrink-0" />
+                        <span>Type or speak your answers</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Check className="h-4 w-4 text-teal mt-0.5 flex-shrink-0" />
+                        <span>Get detailed skill breakdown</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Check className="h-4 w-4 text-teal mt-0.5 flex-shrink-0" />
+                        <span>Personalized course based on results</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Button
+              onClick={handleNext}
+              className="w-full bg-teal text-white hover:bg-teal-hover py-4 rounded-[16px] font-semibold shadow-md"
+            >
+              Start Assessment
+            </Button>
+
+            <p className="text-xs text-center text-text-secondary font-body">
+              Don't worry, this is just to help us personalize your learning!
+            </p>
+          </div>
+        );
+
+      // Step 16: Assessment Chat (Full-Screen)
+      case 16:
+        return (
+          <div className="fixed inset-0 bg-bg-primary z-50">
+            <AssessmentChat
+              userProfile={{
+                name: userName,
+                level: englishLevel === 'beginner' ? 'A2' : englishLevel === 'intermediate' ? 'B1' : englishLevel === 'advanced' ? 'C1' : 'C2',
+                nativeLanguage: 'Hinglish (हिन्दी)',
+                learningGoals: primaryGoal,
+                challenges: {
+                  primary: whatStopsYou,
+                  conversation: hardestPart,
+                },
+                challengesContext: `${userName} is learning English to ${primaryGoal.join(', ')}.`,
+                gender,
+                ageRange,
+                currentStatus,
+                interestedField,
+                primaryGoal,
+                whatStopsYou,
+                fearOfSpeaking,
+                hardestPart,
+                feelingWhenSpeak,
+                englishLevel,
+              }}
+              onComplete={handleAssessmentComplete}
+            />
+          </div>
+        );
+
+      // Step 17: Grading Loader
+      case 17:
+        return (
+          <div className="space-y-6 text-center">
+            <div className="text-5xl mb-2">📊</div>
+            <h2 className="text-2xl font-bold text-navy font-display">
+              Analyzing Your Performance
+            </h2>
+            <p className="text-sm text-text-secondary font-body">
+              Evaluating your pronunciation, vocabulary, grammar, fluency, clarity, and listening skills...
+            </p>
+            <div className="flex justify-center items-center gap-3 mt-6">
+              <Loader2 className="h-6 w-6 text-teal animate-spin" />
+              <p className="text-sm font-semibold text-teal font-body">
+                Processing assessment...
+              </p>
+            </div>
+          </div>
+        );
+
+      // Step 18: Assessment Results
+      case 18:
+        if (!assessmentResult) {
+          // Fallback if no results
+          return (
+            <div className="space-y-6 text-center">
+              <div className="text-4xl mb-4">⚠️</div>
+              <h2 className="text-xl font-bold text-navy font-display mb-2">
+                Assessment Incomplete
+              </h2>
+              <p className="text-sm text-text-secondary font-body mb-4">
+                Something went wrong with the assessment.
+              </p>
+              <Button
+                onClick={() => setStep(15)}
+                className="w-full bg-coral text-white hover:bg-coral-hover py-4 rounded-[16px] font-semibold"
+              >
+                Retry Assessment
+              </Button>
+            </div>
+          );
+        }
+
+        return (
+          <div className="fixed inset-0 z-50 bg-white">
+            <ResultsBreakdownPage
+              userName={userName}
+              analysis={assessmentResult}
+              onNavigate={(destination) => {
+                if (destination === 'explore') {
+                  handleNext();
+                } else if (destination === 'retake') {
+                  setAssessmentResult(null);
+                  setStep(15);
+                }
+              }}
+              onBack={handleNext}
+            />
+          </div>
+        );
+
+      // Step 19: AI Personalization Loader
+      case 19:
         if (!isGenerating && !generationComplete) {
           handleGenerateRoadmap();
         }
@@ -769,8 +1035,8 @@ export default function OnboardingPage() {
           </div>
         );
 
-      // Step 16: Video Introduction
-      case 16:
+      // Step 20: Video Introduction
+      case 20:
         return (
           <div className="space-y-6">
             <div className="text-center space-y-3">
@@ -843,7 +1109,7 @@ export default function OnboardingPage() {
         </div>
 
         {/* Back Button */}
-        {step > 1 && step !== 15 && step !== 16 && (
+        {step > 1 && step < 16 && (
           <Button
             onClick={handleBack}
             variant="ghost"
@@ -853,6 +1119,7 @@ export default function OnboardingPage() {
           </Button>
         )}
       </div>
+
     </div>
   );
 }

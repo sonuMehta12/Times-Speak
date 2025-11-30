@@ -2,12 +2,13 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Volume2, Languages, Lightbulb, Mic, MoreVertical, Square, RotateCcw, Play, Keyboard, Send } from "lucide-react";
+import { ArrowLeft, Volume2, Languages, Lightbulb, Mic, MoreVertical, RotateCcw, Play, Keyboard, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useLessonContext } from "@/lib/context/LessonContext";
 import { Lesson, Unit, RolePlayLine } from "@/lib/types/language";
+import VoiceRecorder from "@/components/common/VoiceRecorder";
 
 interface IndividualRoleplayProps {
   type: "individual";
@@ -39,8 +40,6 @@ export default function RoleplayClient(props: Props) {
 
   const [displayedMessages, setDisplayedMessages] = useState<Message[]>([]);
   const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingState, setRecordingState] = useState<'idle' | 'recording' | 'processing'>('idle');
   const [isConversationComplete, setIsConversationComplete] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [showHint, setShowHint] = useState(false);
@@ -48,7 +47,6 @@ export default function RoleplayClient(props: Props) {
   const [inputMode, setInputMode] = useState<'voice' | 'keyboard'>('voice');
   const [typedMessage, setTypedMessage] = useState('');
 
-  const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasInitializedRef = useRef(false);
   const isSpeakingRef = useRef(false);
@@ -57,20 +55,6 @@ export default function RoleplayClient(props: Props) {
     const { lesson, unitId } = props;
     const roleplayDialogue = lesson.roleplay || [];
 
-    // Initialize speech recognition
-    useEffect(() => {
-      if (typeof window !== 'undefined') {
-        const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-        if (SpeechRecognition && !recognitionRef.current) {
-          console.log('Initializing speech recognition...');
-          recognitionRef.current = new SpeechRecognition();
-          recognitionRef.current.continuous = false;
-          recognitionRef.current.interimResults = false;
-          recognitionRef.current.lang = 'en-US';
-          console.log('Speech recognition initialized successfully');
-        }
-      }
-    }, []);
 
     // Start conversation with first AI message(s) - only once using ref
     useEffect(() => {
@@ -242,9 +226,6 @@ export default function RoleplayClient(props: Props) {
       setTimeout(() => {
         playAITurns(currentTurnIndex + 1);
       }, 1000);
-
-      setRecordingState('idle');
-      setIsRecording(false);
     };
 
     const handleTypedMessage = () => {
@@ -278,62 +259,6 @@ export default function RoleplayClient(props: Props) {
       }, 1000);
     };
 
-    const startRecording = () => {
-      if (!recognitionRef.current) {
-        console.error('Speech recognition not initialized');
-        alert('Speech recognition is not available in your browser.');
-        return;
-      }
-
-      if (isRecording || isAISpeaking) {
-        console.log('Already recording or AI is speaking');
-        return;
-      }
-
-      try {
-        console.log('Starting speech recognition...');
-
-        // Set up event handlers with current function references
-        recognitionRef.current.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          console.log('Speech recognition result:', transcript);
-          handleSpeechResult(transcript);
-        };
-
-        recognitionRef.current.onerror = (error: any) => {
-          console.error('Speech recognition error:', error);
-          setRecordingState('idle');
-          setIsRecording(false);
-          alert(`Speech recognition error: ${error.error}. Please check microphone permissions.`);
-        };
-
-        recognitionRef.current.onend = () => {
-          console.log('Speech recognition ended');
-          setRecordingState('idle');
-          setIsRecording(false);
-        };
-
-        recognitionRef.current.onstart = () => {
-          console.log('Speech recognition started successfully');
-        };
-
-        setRecordingState('recording');
-        setIsRecording(true);
-        recognitionRef.current.start();
-      } catch (error) {
-        console.error('Error starting speech recognition:', error);
-        alert('Unable to start speech recognition. Please check microphone permissions.');
-        setRecordingState('idle');
-        setIsRecording(false);
-      }
-    };
-
-    const stopRecording = () => {
-      if (recognitionRef.current && isRecording) {
-        recognitionRef.current.stop();
-        setRecordingState('processing');
-      }
-    };
 
     const getHintMessage = () => {
       if (currentTurnIndex >= roleplayDialogue.length) return "";
@@ -603,31 +528,19 @@ export default function RoleplayClient(props: Props) {
                 {/* Action Buttons */}
                 <div className="flex gap-3">
                   {inputMode === 'voice' ? (
-                    <Button
-                      onClick={isRecording ? stopRecording : startRecording}
-                      disabled={recordingState === 'processing' || !isUserTurn || isAISpeaking}
-                      className={`flex-1 py-4 rounded-2xl font-semibold shadow-lg transition-all active:scale-95 ${
-                        isRecording
-                          ? 'bg-error hover:bg-error/90 text-white'
-                          : 'bg-coral hover:bg-coral-hover text-white disabled:bg-gray-300 disabled:cursor-not-allowed'
-                      }`}
-                    >
-                      {isRecording ? (
-                        <>
-                          <Square className="h-5 w-5 mr-2" />
-                          Stop Recording
-                        </>
-                      ) : recordingState === 'processing' ? (
-                        'Processing...'
-                      ) : !isUserTurn ? (
-                        'Wait for your turn...'
-                      ) : (
-                        <>
-                          <Mic className="h-5 w-5 mr-2" />
-                          Start Speaking
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex-1">
+                      <VoiceRecorder
+                        mode="manual"
+                        onRecordingComplete={handleSpeechResult}
+                        disabled={!isUserTurn || isAISpeaking}
+                        variant="default"
+                        buttonText={!isUserTurn ? "Wait for your turn..." : "Speak"}
+                        showInterimResults={true}
+                        maxDuration={60}
+                        className="w-full py-4 rounded-2xl font-semibold shadow-lg"
+                        onError={(error) => console.error('Voice recording error:', error)}
+                      />
+                    </div>
                   ) : (
                     <Button
                       disabled={!isUserTurn || isAISpeaking}

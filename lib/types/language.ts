@@ -35,13 +35,25 @@ export interface PhraseExplanation {
  */
 export interface Lesson {
   id: string;
+  /** Lesson name - ALWAYS in English (e.g., "Casual Greetings") */
   title?: string;
+  /** The English phrase being taught - ALWAYS in English (e.g., "Hey! How's it going?") */
   phrase: string;
+  /** Explanation of the phrase - IN HINGLISH (Hindi-English mix for Hindi-speaking learners) */
   phraseMeaning?: string;
+  /** Teaching script/instructions - ALWAYS in English */
   script: string;
   phraseExplanations?: PhraseExplanation[];
   cueQuestion: CueQuestion;
   roleplay: RolePlayLine[];
+  // Home page daily lesson card fields
+  /** @deprecated Image URLs are no longer used - lessons use solid color backgrounds with category emojis */
+  imageUrl?: string;
+  duration?: string;
+  /** Category name - ALWAYS in English (e.g., "Conversation", "Professional", "Workplace") */
+  category?: string;
+  /** Brief lesson description - IN HINGLISH (Hindi-English mix for Hindi-speaking learners) */
+  subtitle?: string;
 }
 
 /**
@@ -55,6 +67,7 @@ export interface FinalQuizContent {
 
 /**
  * Final roleplay content (comprehensive conversation)
+ * @deprecated No longer used - units now only have finalQuiz
  */
 export interface FinalRoleplayContent {
   id: string;
@@ -64,12 +77,14 @@ export interface FinalRoleplayContent {
 
 /**
  * Represents a learning unit containing multiple lessons
+ * Current implementation uses 1 unit with 7 lessons
  */
 export interface Unit {
   unitId: string;
   title: string;
   lessons: Lesson[];
   finalQuiz?: FinalQuizContent;
+  /** @deprecated Final roleplay removed - units now only have final quiz */
   finalRoleplay?: FinalRoleplayContent;
 }
 

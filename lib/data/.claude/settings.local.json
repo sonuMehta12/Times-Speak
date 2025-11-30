@@ -3,7 +3,20 @@
     "allow": [
       "Bash(del \"c:\\Users\\sonu1\\OneDrive - HR sevice PVT LTD\\Documents\\Desktop\\project\\lib\\data\\events.ts\")",
       "Bash(del \"c:\\Users\\sonu1\\OneDrive - HR sevice PVT LTD\\Documents\\Desktop\\project\\lib\\data\\categories.ts\")",
-      "Bash(del \"c:\\Users\\sonu1\\OneDrive - HR sevice PVT LTD\\Documents\\Desktop\\project\\lib\\types\\event.ts\")"
+      "Bash(del \"c:\\Users\\sonu1\\OneDrive - HR sevice PVT LTD\\Documents\\Desktop\\project\\lib\\types\\event.ts\")",
+      "Bash(timeout:*)",
+      "Bash(nul)",
+      "Bash(powershell -Command:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx next lint:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(cd:*)",
+      "Bash(cat:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

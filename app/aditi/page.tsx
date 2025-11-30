@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Volume2, Languages, Lightbulb, Mic, Keyboard, ChevronDown, Star, MicOff, Phone, Send, X } from 'lucide-react';
+import { ArrowLeft, Volume2, Languages, Lightbulb, Keyboard, ChevronDown, Star, Phone, Send, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -10,6 +10,7 @@ import { generateAditiResponse, generateSpeechBase64, playAudioFromBase64, conve
 import { getRandomAditiGreeting, getGreetingHinglish, getGreetingHints } from '@/lib/utils/aditi-greetings';
 import { AditiMessage } from '@/lib/types/aditi';
 import { UserProfile } from '@/lib/types/roleplay';
+import VoiceRecorder from '@/components/common/VoiceRecorder';
 
 type MessageSender = 'user' | 'ai';
 
@@ -94,12 +95,8 @@ export default function ChatPage() {
   const [showHintModal, setShowHintModal] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [typeInput, setTypeInput] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
   const [autoPlayEnabled, setAutoPlayEnabled] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Speech recognition
-  const recognitionRef = useRef<any>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -247,58 +244,6 @@ export default function ChatPage() {
     handleSendMessage(hint);
   };
 
-  // Handle Speak button - Speech recognition
-  const handleSpeakStart = () => {
-    // Stop any existing recognition first (restart from beginning)
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {
-        // Ignore errors when stopping
-      }
-    }
-
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      alert('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
-      return;
-    }
-
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      setIsRecording(true);
-    };
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      handleSendMessage(transcript);
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
-      setIsRecording(false);
-    };
-
-    recognition.onend = () => {
-      setIsRecording(false);
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-  };
-
-  const handleSpeakStop = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
   return (
     <div className="w-full">
       <div className="fixed inset-0 flex flex-col bg-bg-card max-w-[393px] mx-auto left-0 right-0 z-50">
@@ -366,17 +311,17 @@ export default function ChatPage() {
               <span className="text-xs font-semibold font-body">Type</span>
             </button>
 
-            <button
-              onClick={isRecording ? handleSpeakStop : handleSpeakStart}
-              className="flex flex-col items-center gap-1.5 text-text-secondary hover:text-navy transition-colors transform -translate-y-2"
-            >
-              <div className={`h-16 w-16 rounded-full flex items-center justify-center shadow-lg transition-all ${
-                isRecording ? 'bg-error text-white shadow-error/30 animate-pulse' : 'bg-coral text-white shadow-coral/30 hover:bg-coral-hover'
-              }`}>
-                {isRecording ? <MicOff className="h-7 w-7" /> : <Mic className="h-7 w-7" />}
-              </div>
-              <span className="text-xs font-semibold font-body">{isRecording ? 'Stop' : 'Speak'}</span>
-            </button>
+            <div className="transform -translate-y-2">
+              <VoiceRecorder
+                mode="manual"
+                onRecordingComplete={handleSendMessage}
+                variant="large"
+                showInterimResults={true}
+                disabled={isLoading}
+                maxDuration={120}
+                onError={(error) => console.error('Voice recording error:', error)}
+              />
+            </div>
 
             <button
               onClick={() => setShowHintModal(true)}

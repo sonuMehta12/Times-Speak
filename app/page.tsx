@@ -2,11 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import StreakProgressWidget from "@/components/StreakProgressWidget";
-import LearningPath from "@/components/LearningPath";
+import DailyLessonCard from "@/components/DailyLessonCard";
+import QuickAccessGrid from "@/components/QuickAccessGrid";
+import BestRolePlays from "@/components/BestRolePlays";
+import DailyChallenge from "@/components/DailyChallenge";
 
 export default function Home() {
   const [userName, setUserName] = useState("John");
-
 
   // Load user data from localStorage
   useEffect(() => {
@@ -21,16 +23,22 @@ export default function Home() {
     }
   }, []);
 
-
-
-  
   return (
     <div className="w-full space-y-6">
-      <StreakProgressWidget
-        userName={userName}
-      />
-      {/* Learning Path Section */}
-      <LearningPath />
+      {/* Streak & Progress */}
+      <StreakProgressWidget userName={userName} />
+
+      {/* Hero Daily Lesson */}
+      <DailyLessonCard />
+
+      {/* Quick Actions Grid */}
+      <QuickAccessGrid />
+
+      {/* Best Role Plays Horizontal Scroll */}
+      <BestRolePlays />
+
+      {/* Daily Challenge Quiz */}
+      <DailyChallenge />
     </div>
   );
 }

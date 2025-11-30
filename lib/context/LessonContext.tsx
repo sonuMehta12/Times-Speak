@@ -1,8 +1,9 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { UserProgress, Lesson, LessonProgress } from "@/lib/types/language";
+import { UserProgress, Lesson, LessonProgress, Unit } from "@/lib/types/language";
 import { UNITS_DATA } from "@/lib/data/units";
+import { loadPersonalizedCourse } from "@/lib/services/course-generator-client";
 import {
   initializeProgress,
   saveProgress,
@@ -52,7 +53,35 @@ interface LessonContextType {
 
 const LessonContext = createContext<LessonContextType | undefined>(undefined);
 
+/**
+ * Load units - prioritizes personalized course from localStorage,
+ * falls back to default UNITS_DATA
+ */
+function loadUnits(): Unit[] {
+  if (typeof window === 'undefined') return UNITS_DATA;
+
+  try {
+    const personalizedCourse = loadPersonalizedCourse();
+    if (personalizedCourse && personalizedCourse.units && personalizedCourse.units.length > 0) {
+      console.log('✓ Loading personalized course:', {
+        units: personalizedCourse.courseSummary.totalUnits,
+        lessons: personalizedCourse.courseSummary.totalLessons,
+        focusAreas: personalizedCourse.courseSummary.focusAreas,
+        estimatedDuration: personalizedCourse.courseSummary.estimatedDuration
+      });
+      return personalizedCourse.units;
+    }
+  } catch (error) {
+    console.error('Failed to load personalized course, using default units:', error);
+  }
+
+  console.log('⚠ No personalized course found, using default UNITS_DATA');
+  return UNITS_DATA;
+}
+
 export function LessonProvider({ children }: { children: React.ReactNode }) {
+  // Load units (personalized or default)
+  const [units, setUnits] = useState<Unit[]>(() => loadUnits());
   const [userProgress, setUserProgress] = useState<UserProgress>(() => {
     // Initialize from localStorage or create new
     if (typeof window !== "undefined") {

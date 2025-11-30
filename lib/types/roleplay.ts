@@ -32,6 +32,14 @@ export interface UserProfile {
   totalTimeMinutes?: number; // Total learning time in minutes
   roleplayCompleted?: number; // Number of roleplay sessions completed
   lastActiveDate?: string; // ISO date string of last activity
+
+  // Assessment-related fields
+  assessmentResult?: ConversationAnalysis; // Result from English proficiency assessment
+  assessmentCompletedAt?: string; // ISO date string when assessment was completed
+  learningPriorities?: string[]; // Prioritized skills to focus on based on assessment
+  recommendedStartingPoint?: string; // Recommended lesson/unit to start with
+  hasPersonalizedCourse?: boolean; // Whether AI-generated personalized course exists
+  courseGeneratedAt?: string; // ISO date string when personalized course was generated
 }
 
 /**

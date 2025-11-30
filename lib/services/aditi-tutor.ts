@@ -119,6 +119,7 @@ export const generateSpeechBase64 = async (text: string): Promise<string> => {
  * Helper to decode and play raw PCM using AudioContext
  */
 let audioContext: AudioContext | null = null;
+let currentSource: AudioBufferSourceNode | null = null;
 
 export const ensureAudioContext = async (): Promise<void> => {
   if (!audioContext) {
@@ -129,7 +130,25 @@ export const ensureAudioContext = async (): Promise<void> => {
   }
 };
 
-export const playAudioFromBase64 = async (base64Audio: string): Promise<void> => {
+/**
+ * Stop any currently playing audio
+ */
+export const stopAudio = (): void => {
+  if (currentSource) {
+    try {
+      currentSource.stop();
+      currentSource.disconnect();
+    } catch (e) {
+      // Already stopped
+    }
+    currentSource = null;
+  }
+};
+
+export const playAudioFromBase64 = async (base64Audio: string): Promise<AudioBufferSourceNode> => {
+  // Stop any currently playing audio first
+  stopAudio();
+
   // Initialize AudioContext lazily
   if (!audioContext) {
     audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -166,7 +185,18 @@ export const playAudioFromBase64 = async (base64Audio: string): Promise<void> =>
   const source = audioContext.createBufferSource();
   source.buffer = buffer;
   source.connect(audioContext.destination);
+
+  // Track globally
+  currentSource = source;
+
+  source.onended = () => {
+    if (currentSource === source) {
+      currentSource = null;
+    }
+  };
+
   source.start();
+  return source;
 };
 
 /**
