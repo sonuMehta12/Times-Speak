@@ -40,7 +40,7 @@ export default function OnboardingPage() {
   // Validation errors
   const [nameError, setNameError] = useState('');
 
-  const totalSteps = 20; // Updated to include assessment flow steps
+  const totalSteps = 18; // Updated to include assessment flow steps
   const progress = (step / totalSteps) * 100;
 
   const handleNext = () => {
@@ -59,7 +59,7 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     // Map onboarding data to UserProfile format
     const userProfile: UserProfile = {
       name: userName,
@@ -90,6 +90,12 @@ export default function OnboardingPage() {
       totalTimeMinutes: 0,
       roleplayCompleted: 0,
       lastActiveDate: new Date().toISOString(),
+      
+      // Include assessment data if available
+      assessmentResult: assessmentResult || undefined,
+      assessmentCompletedAt: assessmentResult ? new Date().toISOString() : undefined,
+      hasPersonalizedCourse: true,
+      courseGeneratedAt: new Date().toISOString(),
     };
 
     // Clear any existing learning progress for fresh start
@@ -100,6 +106,21 @@ export default function OnboardingPage() {
     localStorage.setItem('onboardingCompleted', 'true');
 
     console.log('Onboarding completed! Starting fresh.', userProfile);
+
+    // Generate personalized course in the background if assessment result exists
+    if (assessmentResult) {
+      generatePersonalizedCourse({
+        userData: userProfile,
+        assessmentResult: assessmentResult,
+        targetUnits: 1,
+      }).then(course => {
+        savePersonalizedCourse(course);
+        console.log('Personalized course generated successfully');
+      }).catch(error => {
+        console.error('Background course generation failed:', error);
+        // Continue anyway, user can use default units
+      });
+    }
 
     // Navigate to home page
     router.push('/');
@@ -925,7 +946,7 @@ export default function OnboardingPage() {
           </div>
         );
 
-      // Step 18: Assessment Results
+      // Step 18: Assessment Results (Final Step)
       case 18:
         if (!assessmentResult) {
           // Fallback if no results
@@ -955,125 +976,126 @@ export default function OnboardingPage() {
               analysis={assessmentResult}
               onNavigate={(destination) => {
                 if (destination === 'explore') {
-                  handleNext();
+                  handleComplete();
                 } else if (destination === 'retake') {
                   setAssessmentResult(null);
                   setStep(15);
                 }
               }}
-              onBack={handleNext}
+              onBack={handleComplete}
+              continueButtonText="Start Learning Journey"
             />
           </div>
         );
 
-      // Step 19: AI Personalization Loader
-      case 19:
-        if (!isGenerating && !generationComplete) {
-          handleGenerateRoadmap();
-        }
+      // Commented out - Step 19: AI Personalization Loader
+      // case 19:
+      //   if (!isGenerating && !generationComplete) {
+      //     handleGenerateRoadmap();
+      //   }
 
-        return (
-          <div className="space-y-6">
-            <div className="text-center space-y-3">
-              <div className="text-5xl mb-2">🎯</div>
-              <h2 className="text-2xl font-bold text-navy font-display">
-                {generationComplete ? 'All Set!' : 'Creating Your Journey'}
-              </h2>
+      //   return (
+      //     <div className="space-y-6">
+      //       <div className="text-center space-y-3">
+      //         <div className="text-5xl mb-2">🎯</div>
+      //         <h2 className="text-2xl font-bold text-navy font-display">
+      //           {generationComplete ? 'All Set!' : 'Creating Your Journey'}
+      //         </h2>
 
-              {!generationComplete ? (
-                <>
-                  <p className="text-sm text-text-secondary font-body">
-                    We're creating your personalized learning roadmap...
-                  </p>
+      //         {!generationComplete ? (
+      //           <>
+      //             <p className="text-sm text-text-secondary font-body">
+      //               We're creating your personalized learning roadmap...
+      //             </p>
 
-                  <div className="space-y-4 mt-6">
-                    <div className="flex items-center justify-center gap-3">
-                      <Loader2 className="h-5 w-5 text-teal animate-spin" />
-                      <p className="text-sm font-semibold text-teal font-body">
-                        Analyzing your goals...
-                      </p>
-                    </div>
+      //             <div className="space-y-4 mt-6">
+      //               <div className="flex items-center justify-center gap-3">
+      //                 <Loader2 className="h-5 w-5 text-teal animate-spin" />
+      //                 <p className="text-sm font-semibold text-teal font-body">
+      //                   Analyzing your goals...
+      //                 </p>
+      //               </div>
 
-                    <div className="flex items-center justify-center gap-3 opacity-60">
-                      <Loader2 className="h-5 w-5 text-coral animate-spin" />
-                      <p className="text-sm font-semibold text-coral font-body">
-                        Selecting right scenarios...
-                      </p>
-                    </div>
+      //               <div className="flex items-center justify-center gap-3 opacity-60">
+      //                 <Loader2 className="h-5 w-5 text-coral animate-spin" />
+      //                 <p className="text-sm font-semibold text-coral font-body">
+      //                   Selecting right scenarios...
+      //                 </p>
+      //               </div>
 
-                    <div className="flex items-center justify-center gap-3 opacity-40">
-                      <Loader2 className="h-5 w-5 text-navy animate-spin" />
-                      <p className="text-sm font-semibold text-navy font-body">
-                        Preparing your journey...
-                      </p>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <Card className="border-2 border-teal/30 bg-gradient-to-br from-teal/10 to-teal/5 rounded-[24px] shadow-md mt-6">
-                  <CardContent className="p-6 text-center space-y-3">
-                    <div className="text-4xl mb-2">✨</div>
-                    <p className="text-lg font-bold text-teal font-display">
-                      All set! We're ready for your first lesson.
-                    </p>
-                    <p className="text-sm text-text-secondary font-body">
-                      Your personalized learning path is ready, {userName}!
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+      //               <div className="flex items-center justify-center gap-3 opacity-40">
+      //                 <Loader2 className="h-5 w-5 text-navy animate-spin" />
+      //                 <p className="text-sm font-semibold text-navy font-body">
+      //                   Preparing your journey...
+      //                 </p>
+      //               </div>
+      //             </div>
+      //           </>
+      //         ) : (
+      //           <Card className="border-2 border-teal/30 bg-gradient-to-br from-teal/10 to-teal/5 rounded-[24px] shadow-md mt-6">
+      //             <CardContent className="p-6 text-center space-y-3">
+      //               <div className="text-4xl mb-2">✨</div>
+      //               <p className="text-lg font-bold text-teal font-display">
+      //                 All set! We're ready for your first lesson.
+      //               </p>
+      //               <p className="text-sm text-text-secondary font-body">
+      //                 Your personalized learning path is ready, {userName}!
+      //               </p>
+      //             </CardContent>
+      //           </Card>
+      //         )}
+      //       </div>
 
-            {generationComplete && (
-              <Button
-                onClick={handleNext}
-                className="w-full bg-coral text-white hover:bg-coral-hover py-4 rounded-[16px] font-semibold shadow-md"
-              >
-                Continue
-              </Button>
-            )}
-          </div>
-        );
+      //       {generationComplete && (
+      //         <Button
+      //           onClick={handleNext}
+      //           className="w-full bg-coral text-white hover:bg-coral-hover py-4 rounded-[16px] font-semibold shadow-md"
+      //         >
+      //           Continue
+      //         </Button>
+      //       )}
+      //     </div>
+      //   );
 
-      // Step 20: Video Introduction
-      case 20:
-        return (
-          <div className="space-y-6">
-            <div className="text-center space-y-3">
-              <div className="text-5xl">🎉</div>
-              <h2 className="text-2xl font-bold text-navy font-display">
-                One Last Thing!
-              </h2>
-              <p className="text-sm text-text-secondary font-body">
-                Watch this quick video to see how TimesSpeak works
-              </p>
-            </div>
+      // Commented out - Step 20: Video Introduction
+      // case 20:
+      //   return (
+      //     <div className="space-y-6">
+      //       <div className="text-center space-y-3">
+      //         <div className="text-5xl">🎉</div>
+      //         <h2 className="text-2xl font-bold text-navy font-display">
+      //           One Last Thing!
+      //         </h2>
+      //         <p className="text-sm text-text-secondary font-body">
+      //           Watch this quick video to see how TimesSpeak works
+      //         </p>
+      //       </div>
 
-            {/* Video Player */}
-            <Card className="border-gray-200 rounded-[24px] overflow-hidden shadow-lg">
-              <div className="relative aspect-video bg-gradient-to-br from-navy via-teal to-coral flex items-center justify-center">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center text-white">
-                    <Play className="w-16 h-16 mb-4 mx-auto opacity-50" />
-                    <p className="text-sm font-semibold mb-2 font-body">Introduction Video</p>
-                    <p className="text-xs opacity-80 font-body">Coming Soon</p>
-                  </div>
-                </div>
-              </div>
-            </Card>
+      //       {/* Video Player */}
+      //       <Card className="border-gray-200 rounded-[24px] overflow-hidden shadow-lg">
+      //         <div className="relative aspect-video bg-gradient-to-br from-navy via-teal to-coral flex items-center justify-center">
+      //           <div className="absolute inset-0 flex items-center justify-center">
+      //             <div className="text-center text-white">
+      //               <Play className="w-16 h-16 mb-4 mx-auto opacity-50" />
+      //               <p className="text-sm font-semibold mb-2 font-body">Introduction Video</p>
+      //               <p className="text-xs opacity-80 font-body">Coming Soon</p>
+      //             </div>
+      //           </div>
+      //         </div>
+      //       </Card>
 
-            <Button
-              onClick={handleComplete}
-              className="w-full bg-coral text-white hover:bg-coral-hover py-4 rounded-[16px] font-semibold shadow-md"
-            >
-              Start Learning
-            </Button>
+      //       <Button
+      //         onClick={handleComplete}
+      //         className="w-full bg-coral text-white hover:bg-coral-hover py-4 rounded-[16px] font-semibold shadow-md"
+      //       >
+      //         Start Learning
+      //       </Button>
 
-            <p className="text-xs text-center text-text-secondary font-body">
-              Skip the intro and start your learning journey
-            </p>
-          </div>
-        );
+      //       <p className="text-xs text-center text-text-secondary font-body">
+      //         Skip the intro and start your learning journey
+      //       </p>
+      //     </div>
+      //   );
 
       default:
         return null;

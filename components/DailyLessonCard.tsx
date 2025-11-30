@@ -62,6 +62,11 @@ export default function DailyLessonCard() {
     router.push(`/${unitId}/${currentLesson.id}/lesson`);
   };
 
+  // Handle view all lessons
+  const handleViewAll = () => {
+    router.push('/learn');
+  };
+
   if (!currentLesson) {
     return null;
   }
@@ -74,15 +79,28 @@ export default function DailyLessonCard() {
 
       <div className="relative group w-full bg-white rounded-3xl p-4 shadow-lg shadow-gray-200/50 border border-gray-100 transition-transform hover:scale-[1.01] duration-300">
 
-        {/* Solid Color Background with Emoji */}
+        {/* Lesson Image or Solid Color Background with Emoji */}
         <div
-          className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden mb-4 flex items-center justify-center"
-          style={{ backgroundColor: getCategoryColor(currentLesson.category) }}
+          className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden mb-4"
         >
-          {/* Category Emoji */}
-          <div className="text-6xl">
-            {getCategoryEmoji(currentLesson.category)}
-          </div>
+          {currentLesson.imageUrl ? (
+            // Display image if available
+            <img 
+              src={currentLesson.imageUrl} 
+              alt={currentLesson.title || 'Daily lesson image'}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            // Fallback to colored background with emoji
+            <div
+              className="w-full h-full flex items-center justify-center"
+              style={{ backgroundColor: getCategoryColor(currentLesson.category) }}
+            >
+              <div className="text-6xl">
+                {getCategoryEmoji(currentLesson.category)}
+              </div>
+            </div>
+          )}
 
           {/* Duration Badge */}
           <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-navy shadow-sm">
@@ -110,21 +128,31 @@ export default function DailyLessonCard() {
           </p>
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
+          <div className="space-y-3">
             <Button
               onClick={handleStartLesson}
-              className="flex-1 bg-coral hover:bg-coral-hover text-white font-semibold py-3.5 px-6 rounded-xl shadow-lg shadow-coral/20 active:scale-95 transition-all h-auto"
+              className="w-full bg-coral hover:bg-coral-hover text-white font-semibold py-3.5 px-6 rounded-xl shadow-lg shadow-coral/20 active:scale-95 transition-all h-auto"
             >
               Start Lesson
             </Button>
-            {unlockedLessons.length > 1 && (
+            
+            <div className="flex gap-3">
               <Button
-                onClick={handleSwap}
-                className="bg-coral/10 hover:bg-coral/20 text-coral font-semibold py-3.5 px-5 rounded-xl transition-colors active:scale-95 h-auto"
+                onClick={handleViewAll}
+                variant="outline"
+                className="flex-1 border-2 border-navy/20 hover:border-navy/40 hover:bg-navy/5 text-navy font-semibold py-3 px-4 rounded-xl transition-all active:scale-95 h-auto"
               >
-                <RefreshCw size={20} />
+                View All
               </Button>
-            )}
+              {unlockedLessons.length > 1 && (
+                <Button
+                  onClick={handleSwap}
+                  className="bg-coral/10 hover:bg-coral/20 text-coral font-semibold py-3 px-5 rounded-xl transition-colors active:scale-95 h-auto"
+                >
+                  <RefreshCw size={20} />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>

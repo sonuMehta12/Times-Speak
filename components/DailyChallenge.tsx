@@ -86,7 +86,7 @@ export default function DailyChallenge() {
 
         {/* CTA to Full Quiz */}
         <Link 
-          href="/unit_1_introduction/unit_1_final_quiz/quiz"
+          href="/unit_1_introduction/final/quiz"
           className="w-full flex items-center justify-center p-4 bg-gradient-to-r from-coral to-coral-hover rounded-xl shadow-md hover:shadow-lg transition-all group"
         >
           <span className="text-white font-bold text-base">Start Quiz</span>

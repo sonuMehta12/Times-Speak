@@ -47,7 +47,7 @@ export interface Lesson {
   cueQuestion: CueQuestion;
   roleplay: RolePlayLine[];
   // Home page daily lesson card fields
-  /** @deprecated Image URLs are no longer used - lessons use solid color backgrounds with category emojis */
+  /** Image URL for lesson card display - uses placeholder URLs that can be replaced */
   imageUrl?: string;
   duration?: string;
   /** Category name - ALWAYS in English (e.g., "Conversation", "Professional", "Workplace") */

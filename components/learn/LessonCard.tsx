@@ -76,19 +76,32 @@ export default function LessonCard({
         className="w-full text-left transition-transform duration-200 hover:scale-[1.01]"
       >
         <div className="p-4">
-          {/* Solid Color Background with Emoji */}
+          {/* Lesson Image or Solid Color Background with Emoji */}
           <div
-            className="relative w-full aspect-[16/9] rounded-xl overflow-hidden mb-3 shadow-sm flex items-center justify-center"
-            style={{ backgroundColor: getCategoryColor(lesson.category) }}
+            className="relative w-full aspect-[16/9] rounded-xl overflow-hidden mb-3 shadow-sm"
           >
+            {lesson.imageUrl ? (
+              // Display image if available
+              <img 
+                src={lesson.imageUrl} 
+                alt={lesson.title || 'Lesson image'}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              // Fallback to colored background with emoji
+              <div
+                className="w-full h-full flex items-center justify-center"
+                style={{ backgroundColor: getCategoryColor(lesson.category) }}
+              >
+                <div className="text-5xl opacity-70">
+                  {getCategoryEmoji(lesson.category)}
+                </div>
+              </div>
+            )}
+
             {/* Lesson Number Badge */}
             <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-bold text-navy shadow-sm">
               #{lessonNumber}
-            </div>
-
-            {/* Category Emoji */}
-            <div className="text-5xl opacity-70">
-              {getCategoryEmoji(lesson.category)}
             </div>
 
             {/* Duration Badge */}

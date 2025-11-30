@@ -9,6 +9,7 @@ interface ResultsBreakdownPageProps {
     analysis: ConversationAnalysis;
     onNavigate: (destination: 'explore' | 'retake') => void;
     onBack: () => void;
+    continueButtonText?: string;
 }
 
 type SkillKey = 'listening' | 'vocabulary' | 'grammar' | 'fluency' | 'clarity' | 'pronunciation';
@@ -189,7 +190,7 @@ const RadarChart: React.FC<{ data: SkillData[] }> = ({ data }) => {
 };
 
 // --- MAIN PAGE COMPONENT ---
-const ResultsBreakdownPage: React.FC<ResultsBreakdownPageProps> = ({ userName, analysis, onNavigate, onBack }) => {
+const ResultsBreakdownPage: React.FC<ResultsBreakdownPageProps> = ({ userName, analysis, onNavigate, onBack, continueButtonText = "Continue to Explore" }) => {
     const [view, setView] = useState<'summary' | 'list' | 'detail'>('summary');
     const [selectedSkillKey, setSelectedSkillKey] = useState<SkillKey | null>(null);
 
@@ -328,7 +329,7 @@ const ResultsBreakdownPage: React.FC<ResultsBreakdownPageProps> = ({ userName, a
                                 onClick={() => onNavigate('explore')}
                                 className="w-full bg-coral text-white hover:bg-coral-hover rounded-xl h-12 font-semibold shadow-lg"
                             >
-                                Continue to Explore
+                                {continueButtonText}
                             </Button>
                         </div>
                     </div>

@@ -48,7 +48,7 @@ export const INITIAL_USER_PROFILE: UserProfile = {
   gender: 'Male',
   ageRange: '23–27',
   currentStatus: 'Fresher',
-  interestedField: ['Technology'],
+  interestedField: ['Technology','Business', 'Marketing', 'Sales', 'Engineering', 'Design'],
   primaryGoal: ['Speak confidently at work', 'Clear job interviews'],
   whatStopsYou: ['Fear of being judged', 'Run out of vocabulary', 'Grammar mistakes'],
   fearOfSpeaking: 'Sometimes',

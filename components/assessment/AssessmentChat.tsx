@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Volume2, Languages, Keyboard, Send, AlertCircle, Check } from 'lucide-react';
+import { Volume2, Languages, AlertCircle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -33,8 +33,6 @@ interface AssessmentChatProps {
 export default function AssessmentChat({ userProfile, onComplete, onCancel }: AssessmentChatProps) {
   const [messages, setMessages] = useState<AssessmentMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showTypeModal, setShowTypeModal] = useState(false);
-  const [typeInput, setTypeInput] = useState('');
   const [currentTurn, setCurrentTurn] = useState(1);
   const [autoPlayEnabled, setAutoPlayEnabled] = useState(false);
   const [showContinueButton, setShowContinueButton] = useState(false);
@@ -158,8 +156,6 @@ export default function AssessmentChat({ userProfile, onComplete, onCancel }: As
 
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
-    setShowTypeModal(false);
-    setTypeInput('');
 
     try {
       // Convert messages to conversation history
@@ -276,13 +272,6 @@ export default function AssessmentChat({ userProfile, onComplete, onCancel }: As
     }
   };
 
-  // Handle Type button
-  const handleTypeSubmit = () => {
-    if (typeInput.trim()) {
-      handleSendMessage(typeInput);
-    }
-  };
-
   return (
     <div className="w-full h-screen bg-bg-primary flex items-center justify-center px-4">
       <div className="w-full max-w-md h-screen bg-bg-card flex flex-col overflow-hidden shadow-xl">
@@ -361,74 +350,20 @@ export default function AssessmentChat({ userProfile, onComplete, onCancel }: As
               Continue to Results
             </Button>
           ) : (
-            <div className="flex justify-around items-center">
-              <button
-                onClick={() => setShowTypeModal(true)}
+            <div className="flex justify-center items-center">
+              <VoiceRecorder
+                mode="manual"
+                onRecordingComplete={handleSendMessage}
+                variant="large"
+                showInterimResults={true}
                 disabled={isLoading}
-                className="flex flex-col items-center gap-1.5 text-text-secondary hover:text-navy transition-colors disabled:opacity-50"
-              >
-                <div className="h-12 w-12 bg-gray-100 rounded-[18px] flex items-center justify-center shadow-sm hover:bg-gray-200 transition-all">
-                  <Keyboard className="h-5 w-5" />
-                </div>
-                <span className="text-xs font-semibold">Type</span>
-              </button>
-
-              <div className="transform -translate-y-2">
-                <VoiceRecorder
-                  mode="manual"
-                  onRecordingComplete={handleSendMessage}
-                  variant="large"
-                  showInterimResults={true}
-                  disabled={isLoading}
-                  maxDuration={120}
-                  onError={(error) => console.error('Voice recording error:', error)}
-                />
-              </div>
-
-              <div className="w-12"></div> {/* Spacer for balance */}
+                maxDuration={120}
+                onError={(error) => console.error('Voice recording error:', error)}
+              />
             </div>
           )}
         </footer>
 
-        {/* Type Modal */}
-        {showTypeModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50">
-            <div className="bg-white w-full rounded-t-2xl p-6 animate-slide-up">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-lg text-text-primary">Type your response</h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowTypeModal(false)}
-                  className="h-8 w-8 rounded-full"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-              <textarea
-                value={typeInput}
-                onChange={(e) => setTypeInput(e.target.value)}
-                placeholder="Type what you want to say..."
-                className="w-full min-h-[120px] p-3 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-teal/20"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleTypeSubmit();
-                  }
-                }}
-              />
-              <Button
-                onClick={handleTypeSubmit}
-                disabled={!typeInput.trim()}
-                className="w-full mt-4 bg-teal hover:bg-teal-hover text-white rounded-full py-3 font-semibold flex items-center justify-center gap-2"
-              >
-                <Send className="h-5 w-5" />
-                Send Response
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
