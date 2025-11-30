@@ -95,6 +95,16 @@ export const generateAssessmentResponse = async (
 };
 
 /**
+ * Maps CEFR level to DifficultyLevel
+ */
+function mapCEFRToDifficulty(cefrLevel: string): 'Beginner' | 'Intermediate' | 'Advanced' {
+  const level = cefrLevel.toUpperCase();
+  if (level === 'A1' || level === 'A2') return 'Beginner';
+  if (level === 'B1' || level === 'B2') return 'Intermediate';
+  return 'Advanced'; // C1, C2, or anything else
+}
+
+/**
  * Creates a mock scenario object for assessment grading
  * This matches the Scenario interface expected by analyzeConversation
  */
@@ -103,13 +113,15 @@ function createAssessmentScenario(userProfile: UserProfile): Scenario {
     id: 'assessment',
     title: 'English Proficiency Assessment',
     description: 'A conversational assessment to evaluate your English communication skills',
+    topic: 'English Assessment',
     role: 'Assessment Interviewer',
     learningObjective: `Evaluate ${userProfile.name}'s English proficiency across pronunciation, vocabulary, grammar, fluency, clarity, and listening comprehension`,
-    difficulty: userProfile.level || 'B1',
-    estimatedTime: '2 minutes',
-    category: 'Assessment',
-    tags: ['assessment', 'evaluation', 'proficiency'],
-    targetSkills: ['pronunciation', 'vocabulary', 'grammar', 'fluency', 'clarity', 'listening'],
+    difficulty: mapCEFRToDifficulty(userProfile.level || 'B1'),
+    duration: '2 minutes',
+    image: '/assessment-placeholder.jpg',
+    initialGreeting: 'Hi! Welcome to your English assessment.',
+    exampleConversation: [],
+    category: 'assessment',
   };
 }
 

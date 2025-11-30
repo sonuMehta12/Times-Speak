@@ -14,9 +14,45 @@
 import { GoogleGenAI } from "@google/genai";
 import { Unit, Lesson } from "@/lib/types/language";
 import { QuizQuestion } from "@/lib/types/quiz";
-import { AssessmentResult, UserAssessmentData } from "./assessmentService";
+import { UserProfile, ConversationAnalysis } from "@/lib/types/roleplay";
 
 // ============ TYPE DEFINITIONS ============
+
+/**
+ * User assessment data for course generation
+ */
+export interface UserAssessmentData {
+  name: string;
+  interestedField: string[];
+  primaryGoal: string[];
+  currentStatus: string;
+  whatStopsYou: string[];
+  level: string;
+  nativeLanguage: string;
+}
+
+/**
+ * Extended assessment result with CEFR levels per skill
+ */
+export interface AssessmentResult {
+  overallScore: number;
+  overallLevel: string;
+  skills: {
+    pronunciation: SkillAssessment;
+    vocabulary: SkillAssessment;
+    grammar: SkillAssessment;
+    fluency: SkillAssessment;
+    clarity: SkillAssessment;
+    listening: SkillAssessment;
+  };
+}
+
+export interface SkillAssessment {
+  score: number;
+  cefrLevel: string;
+  strength: string;
+  improvement: string;
+}
 
 export interface CourseGenerationInput {
   userData: UserAssessmentData;
@@ -326,6 +362,10 @@ export class CourseGenerationService {
       }
     });
 
+    if (!response.text) {
+      throw new Error('No response from Gemini AI');
+    }
+
     const courseData = this.parseResponse(response.text);
 
     // Optionally generate quizzes for each unit
@@ -360,6 +400,10 @@ export class CourseGenerationService {
               responseMimeType: 'application/json'
             }
           });
+
+          if (!response.text) {
+            throw new Error('No response from Gemini AI for quiz generation');
+          }
 
           const quizData = this.parseResponse(response.text);
 

@@ -50,7 +50,7 @@ export type DifficultyLevel = 'Beginner' | 'Intermediate' | 'Advanced';
 /**
  * Category types matching explore page categories
  */
-export type ScenarioCategory = 'interview' | 'travel' | 'restaurant' | 'shopping' | 'medical' | 'social';
+export type ScenarioCategory = 'interview' | 'travel' | 'restaurant' | 'shopping' | 'medical' | 'social' | 'assessment';
 
 /**
  * A single turn in the example conversation (for Listen Mode)

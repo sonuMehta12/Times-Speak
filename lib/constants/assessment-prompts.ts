@@ -18,7 +18,7 @@ export function generateAssessmentSystemInstruction(
   const goals = userProfile.learningGoals?.join(', ') || 'improve English speaking';
 
   // Map CEFR level to strategy
-  const levelStrategy = {
+  const levelStrategies = {
     'A1': {
       description: 'Complete Beginner',
       approach: 'Use very simple present tense questions. Focus on basic personal info, daily routines, simple likes/dislikes. Speak slowly and clearly.',
@@ -49,7 +49,9 @@ export function generateAssessmentSystemInstruction(
       approach: 'Native-level conversation. Discuss highly abstract concepts, subtle distinctions, expert-level professional topics. Expect near-perfect fluency.',
       topics: ['expert analysis', 'policy discussions', 'philosophical concepts', 'advanced technical topics', 'complex argumentation', 'subtle nuances']
     }
-  }[selfReportedLevel] || levelStrategy['B1'];
+  };
+  
+  const levelStrategy = levelStrategies[selfReportedLevel as keyof typeof levelStrategies] || levelStrategies['B1'];
 
   // Conversation flow structure (5 turns total)
   const conversationFlow = [
