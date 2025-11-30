@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { BrainCircuit, Loader2, Mic, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
+import { BrainCircuit, Loader2, Mic, CheckCircle2, XCircle, ArrowRight, Trophy, Zap } from 'lucide-react';
+import Link from 'next/link';
 
 interface QuizData {
   question: string;
@@ -42,11 +43,23 @@ export default function DailyChallenge() {
   const [quiz, setQuiz] = useState<QuizData | null>(null);
   const [userAnswer, setUserAnswer] = useState('');
   const [feedback, setFeedback] = useState<'none' | 'correct' | 'incorrect'>('none');
+  const [currentLevel, setCurrentLevel] = useState<string>('Level 1');
 
   useEffect(() => {
     // Select a random quiz for the day
     const randomIndex = Math.floor(Math.random() * DAILY_QUIZZES.length);
     setQuiz(DAILY_QUIZZES[randomIndex]);
+
+    // Load user level from localStorage
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      try {
+        const parsedData = JSON.parse(userData);
+        setCurrentLevel(parsedData.level || 'Level 1');
+      } catch (err) {
+        console.error('Error parsing user data:', err);
+      }
+    }
   }, []);
 
   const handleCheck = () => {
@@ -88,11 +101,19 @@ export default function DailyChallenge() {
       <div className="absolute -top-10 -right-10 w-40 h-40 bg-coral/10 rounded-full blur-2xl pointer-events-none"></div>
 
       <div className="relative z-10">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-white rounded-xl shadow-sm">
-            <BrainCircuit className="text-coral" size={20} />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white rounded-xl shadow-sm">
+              <BrainCircuit className="text-coral" size={20} />
+            </div>
+            <h3 className="font-bold text-navy">Daily Challenge</h3>
           </div>
-          <h3 className="font-bold text-navy">Daily Challenge</h3>
+          
+          {/* Current Level Badge */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full shadow-sm border border-coral/20">
+            <Zap size={14} className="text-amber-500" />
+            <span className="text-xs font-semibold text-navy">{currentLevel}</span>
+          </div>
         </div>
 
         <div className="text-center mb-6">
@@ -134,7 +155,7 @@ export default function DailyChallenge() {
         {/* Feedback Message */}
         {feedback !== 'none' && (
           <div
-            className={`flex items-center gap-2 text-sm font-semibold animate-in fade-in slide-in-from-top-2 duration-300 ${
+            className={`flex items-center gap-2 text-sm font-semibold animate-in fade-in slide-in-from-top-2 duration-300 mb-4 ${
               feedback === 'correct' ? 'text-green-600' : 'text-red-500'
             }`}
           >
@@ -160,6 +181,25 @@ export default function DailyChallenge() {
             )}
           </div>
         )}
+
+        {/* CTA to Full Quiz */}
+        <div className="pt-4 border-t border-coral/10">
+          <Link 
+            href="/unit_1_introduction/unit_1_final_quiz/quiz"
+            className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-coral to-coral-hover rounded-xl shadow-md hover:shadow-lg transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <Trophy className="text-white" size={20} />
+              </div>
+              <div className="text-left">
+                <p className="text-white font-bold text-sm">Start Full Quiz</p>
+                <p className="text-white/80 text-xs">Unit 1 - Final Assessment</p>
+              </div>
+            </div>
+            <ArrowRight className="text-white group-hover:translate-x-1 transition-transform" size={20} />
+          </Link>
+        </div>
       </div>
     </div>
   );
