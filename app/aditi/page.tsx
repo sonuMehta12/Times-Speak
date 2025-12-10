@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getUserProfile } from '@/lib/data/user-profile';
-import { generateAditiResponse, generateSpeechBase64, playAudioFromBase64, convertToConversationHistory } from '@/lib/services/aditi-tutor';
+import { generateAditiResponse, generateSpeechBase64, playAudioFromBase64, stopAudio, convertToConversationHistory } from '@/lib/services/aditi-tutor';
 import { getRandomAditiGreeting, getGreetingHinglish, getGreetingHints } from '@/lib/utils/aditi-greetings';
 import { AditiMessage } from '@/lib/types/aditi';
 import { UserProfile } from '@/lib/types/roleplay';
@@ -89,6 +89,13 @@ export default function ChatPage() {
     initializeAditi();
   }, []);
 
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      stopAudio();
+    };
+  }, []);
+
   const [messages, setMessages] = useState<AditiMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentHints, setCurrentHints] = useState<string[]>([]);
@@ -105,6 +112,11 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  // Handle recording start - stop any playing TTS
+  const handleRecordingStart = () => {
+    stopAudio();
+  };
 
   // Handle sending a message to Aditi
   const handleSendMessage = async (messageText: string) => {
@@ -254,7 +266,10 @@ export default function ChatPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => window.history.back()}
+                onClick={() => {
+                  stopAudio(); // Stop audio before navigation
+                  window.history.back();
+                }}
                 className="h-10 w-10 rounded-full hover:bg-gray-100 text-navy flex-shrink-0"
                 aria-label="Go back"
               >
@@ -315,6 +330,7 @@ export default function ChatPage() {
               <VoiceRecorder
                 mode="manual"
                 onRecordingComplete={handleSendMessage}
+                onRecordingStart={handleRecordingStart}
                 variant="large"
                 showInterimResults={true}
                 disabled={isLoading}

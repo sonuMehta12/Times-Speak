@@ -72,6 +72,17 @@ export default function RoleplayClient(props: Props) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [displayedMessages]);
 
+    // Cleanup audio on unmount
+    useEffect(() => {
+      return () => {
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
+        setIsAISpeaking(false);
+        isSpeakingRef.current = false;
+      };
+    }, []);
+
     // Play all consecutive AI messages starting from index
     const playAITurns = (startIndex: number) => {
       console.log('playAITurns called with index:', startIndex);
@@ -340,6 +351,14 @@ export default function RoleplayClient(props: Props) {
       router.push(`/lesson-complete?type=roleplay&unitId=${unitId}&lessonId=${lesson.id}`);
     };
 
+    // Handle recording start - stop any playing TTS
+    const handleRecordingStart = () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setIsAISpeaking(false);
+    };
+
     const isUserTurn = currentTurnIndex < roleplayDialogue.length &&
                        roleplayDialogue[currentTurnIndex].speaker === "B";
 
@@ -352,7 +371,12 @@ export default function RoleplayClient(props: Props) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => router.push('/')}
+                onClick={() => {
+                  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                  }
+                  router.push('/');
+                }}
                 className="h-10 w-10 rounded-full hover:bg-gray-100 text-navy"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -532,6 +556,7 @@ export default function RoleplayClient(props: Props) {
                       <VoiceRecorder
                         mode="manual"
                         onRecordingComplete={handleSpeechResult}
+                        onRecordingStart={handleRecordingStart}
                         disabled={!isUserTurn || isAISpeaking}
                         variant="default"
                         buttonText={!isUserTurn ? "Wait for your turn..." : "Speak"}

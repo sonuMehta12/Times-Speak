@@ -7,11 +7,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Check, Play, Loader2, MessageCircle } from 'lucide-react';
 import MessageBubble from '@/components/common/MessageBubble';
 import { saveUserProfile, updateUserProfile, INITIAL_USER_PROFILE } from '@/lib/data/user-profile';
+import { cn } from '@/lib/utils';
 import { UserProfile, ConversationAnalysis, Message } from '@/lib/types/roleplay';
 import AssessmentChat from '@/components/assessment/AssessmentChat';
 import ResultsBreakdownPage from '@/components/roleplay/ResultsBreakdownPage';
 import { gradeAssessment } from '@/lib/services/assessment-chat';
 import { generatePersonalizedCourse, savePersonalizedCourse } from '@/lib/services/course-generator-client';
+import { stopAudio } from '@/lib/services/aditi-tutor';
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -29,6 +31,7 @@ export default function OnboardingPage() {
   const [hardestPart, setHardestPart] = useState<string[]>([]);
   const [feelingWhenSpeak, setFeelingWhenSpeak] = useState('');
   const [englishLevel, setEnglishLevel] = useState('');
+  const [speakingChallenges, setSpeakingChallenges] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationComplete, setGenerationComplete] = useState(false);
 
@@ -40,15 +43,43 @@ export default function OnboardingPage() {
   // Validation errors
   const [nameError, setNameError] = useState('');
 
-  const totalSteps = 18; // Updated to include assessment flow steps
+  const totalSteps = 16; // Reduced from 18 (consolidated 3 questionnaire steps into 1)
   const progress = (step / totalSteps) * 100;
+
+  // Consolidated questionnaire options
+  const emotionalBarriers = [
+    'Fear of being judged or making mistakes',
+    'Feel anxious & start sweating',
+    'Freeze & forget what to say',
+    'Nervous about my accent',
+    'Avoid speaking situations',
+    'Feel embarrassed when speaking'
+  ];
+
+  const practicalChallenges = [
+    'Not enough practice opportunities',
+    'No comfortable practice environment',
+    'Run out of vocabulary mid-conversation',
+    'Make grammar mistakes',
+    'Unclear pronunciation',
+    'Hard to start conversations',
+    'Hard to maintain flow',
+    'Finding right words takes time',
+    'Understanding accents',
+    'Explaining complex thoughts',
+    'Fast speakers / background noise',
+    'Other'
+  ];
 
   // Cleanup audio whenever step changes
   useEffect(() => {
     return () => {
+      // Stop Web Speech API
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
+      // Stop Gemini TTS
+      stopAudio();
     };
   }, [step]);
 
@@ -57,6 +88,8 @@ export default function OnboardingPage() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
+    // Stop Gemini TTS
+    stopAudio();
     setStep(prev => prev + 1);
   };
 
@@ -65,6 +98,8 @@ export default function OnboardingPage() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
+    // Stop Gemini TTS
+    stopAudio();
     setStep(prev => Math.max(prev - 1, 1));
   };
 
@@ -164,11 +199,38 @@ export default function OnboardingPage() {
     await handleComplete();
   };
 
+  // Map consolidated challenges to individual fields
+  const mapConsolidatedChallenges = (challenges: string[]) => {
+    // Map to emotional barriers (whatStopsYou)
+    const emotional = challenges.filter(c =>
+      emotionalBarriers.includes(c)
+    );
+
+    // Map to practical challenges (hardestPart)
+    const practical = challenges.filter(c =>
+      practicalChallenges.includes(c)
+    );
+
+    // Derive feeling from selection
+    let feeling = 'Slightly nervous but okay';
+    if (challenges.includes('Feel anxious & start sweating')) {
+      feeling = 'Anxious & start sweating';
+    } else if (challenges.includes('Freeze & forget what to say')) {
+      feeling = 'Freeze & forget';
+    } else if (challenges.includes('Avoid speaking situations')) {
+      feeling = 'I avoid speaking';
+    } else if (challenges.includes('Feel embarrassed when speaking')) {
+      feeling = 'I speak but feel embarrassed';
+    }
+
+    return { emotional, practical, feeling };
+  };
+
   // Handle assessment completion
   const handleAssessmentComplete = async (messages: any[]) => {
     setAssessmentMessages(messages);
     setIsGradingAssessment(true);
-    setStep(17); // Auto-advance to grading loader
+    setStep(15); // Auto-advance to grading loader (was Step 17)
 
     try {
       // Build user profile for assessment
@@ -206,11 +268,11 @@ export default function OnboardingPage() {
       const result = await gradeAssessment(userProfile, messagesToGrade);
       setAssessmentResult(result);
       setIsGradingAssessment(false);
-      setStep(18); // Auto-advance to results
+      setStep(16); // Auto-advance to results (was Step 18)
     } catch (error) {
       console.error('Assessment grading failed:', error);
       setIsGradingAssessment(false);
-      setStep(18); // Still advance with fallback
+      setStep(16); // Still advance with fallback (was Step 18)
     }
   };
 
@@ -620,59 +682,91 @@ export default function OnboardingPage() {
           </div>
         );
 
-      // Step 9: What Stops You
+      // Step 9: Consolidated Speaking Challenges (replaces old Steps 9, 12, 13)
       case 9:
-        const barriers = [
-          'Less chances to speak',
-          'No comfortable environment',
-          'Fear of being judged',
-          'Afraid of accent',
-          'Nervous—start sweating',
-          'Freeze & forget words',
-          'Run out of vocabulary',
-          'Grammar mistakes',
-          'Pronunciation not clear',
-          'People speak too fast',
-          'Background noise on calls',
-          'Other'
-        ];
-
         return (
           <div className="space-y-6">
             <MessageBubble
               autoPlay={true}
-              translation="आपको आत्मविश्वास से बोलने से क्या रोकता है?"
+              translation="आपकी अंग्रेजी बोलने की यात्रा में क्या चुनौतियां हैं?"
             >
-              What stops you from speaking confidently? Select all that apply.
+              What challenges do you face in your English speaking journey? Select all that apply.
             </MessageBubble>
 
-            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-              {barriers.map(barrier => {
-                const isSelected = whatStopsYou.includes(barrier);
+            {/* Emotional Barriers Section */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-navy">How do you feel when speaking?</h3>
+              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                {emotionalBarriers.map(challenge => {
+                  const isSelected = speakingChallenges.includes(challenge);
 
-                return (
-                  <Button
-                    key={barrier}
-                    onClick={() => handleMultiSelect(barrier, whatStopsYou, setWhatStopsYou)}
-                    variant="outline"
-                    className={`w-full p-3 h-auto border-2 rounded-[16px] transition-all justify-start text-left ${
-                      isSelected
-                        ? 'border-coral bg-coral/10 shadow-sm'
-                        : 'border-gray-200 hover:border-coral hover:bg-coral/5'
-                    }`}
-                  >
-                    <span className={`text-sm font-semibold font-body ${isSelected ? 'text-coral' : 'text-text-primary'}`}>
-                      {barrier}
-                    </span>
-                    {isSelected && <Check className="w-4 h-4 text-coral ml-auto" />}
-                  </Button>
-                );
-              })}
+                  return (
+                    <Button
+                      key={challenge}
+                      onClick={() => handleMultiSelect(challenge, speakingChallenges, setSpeakingChallenges)}
+                      variant="outline"
+                      className={cn(
+                        "w-full p-3 h-auto border-2 rounded-[16px] transition-all justify-start text-left",
+                        isSelected
+                          ? "border-coral bg-coral/10 shadow-sm"
+                          : "border-gray-200 hover:border-coral hover:bg-coral/5"
+                      )}
+                    >
+                      <span className={cn(
+                        "text-sm font-semibold font-body",
+                        isSelected ? "text-coral" : "text-text-primary"
+                      )}>
+                        {challenge}
+                      </span>
+                      {isSelected && <Check className="w-4 h-4 text-coral ml-auto" />}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Practical Challenges Section */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-navy">What's technically difficult for you?</h3>
+              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                {practicalChallenges.map(challenge => {
+                  const isSelected = speakingChallenges.includes(challenge);
+
+                  return (
+                    <Button
+                      key={challenge}
+                      onClick={() => handleMultiSelect(challenge, speakingChallenges, setSpeakingChallenges)}
+                      variant="outline"
+                      className={cn(
+                        "w-full p-3 h-auto border-2 rounded-[16px] transition-all justify-start text-left",
+                        isSelected
+                          ? "border-coral bg-coral/10 shadow-sm"
+                          : "border-gray-200 hover:border-coral hover:bg-coral/5"
+                      )}
+                    >
+                      <span className={cn(
+                        "text-sm font-semibold font-body",
+                        isSelected ? "text-coral" : "text-text-primary"
+                      )}>
+                        {challenge}
+                      </span>
+                      {isSelected && <Check className="w-4 h-4 text-coral ml-auto" />}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
 
             <Button
-              onClick={handleNext}
-              disabled={whatStopsYou.length === 0}
+              onClick={() => {
+                // Map consolidated challenges to legacy fields
+                const { emotional, practical, feeling } = mapConsolidatedChallenges(speakingChallenges);
+                setWhatStopsYou(emotional);
+                setHardestPart(practical);
+                setFeelingWhenSpeak(feeling);
+                handleNext();
+              }}
+              disabled={speakingChallenges.length === 0}
               className="w-full bg-coral text-white hover:bg-coral-hover py-4 rounded-[16px] font-semibold shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Continue
@@ -743,103 +837,8 @@ export default function OnboardingPage() {
           </div>
         );
 
-      // Step 12: Hardest Part
+      // Step 12: English Level (was Step 14)
       case 12:
-        const hardParts = [
-          'Starting a conversation',
-          'Maintaining flow',
-          'Finding the right words',
-          'Understanding accents',
-          'Explaining complex thoughts',
-          'Handling interruptions',
-          'Asking/answering follow‑ups',
-          'Telling stories',
-          'Summarising clearly'
-        ];
-
-        return (
-          <div className="space-y-6">
-            <MessageBubble
-              autoPlay={true}
-              translation="बोलने में सबसे कठिन हिस्सा क्या है?"
-            >
-              What's the hardest part of speaking for you? Select all that apply.
-            </MessageBubble>
-
-            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-              {hardParts.map(part => {
-                const isSelected = hardestPart.includes(part);
-
-                return (
-                  <Button
-                    key={part}
-                    onClick={() => handleMultiSelect(part, hardestPart, setHardestPart)}
-                    variant="outline"
-                    className={`w-full p-3 h-auto border-2 rounded-[16px] transition-all justify-start text-left ${
-                      isSelected
-                        ? 'border-navy bg-navy/10 shadow-sm'
-                        : 'border-gray-200 hover:border-navy hover:bg-navy/5'
-                    }`}
-                  >
-                    <span className={`text-sm font-semibold font-body ${isSelected ? 'text-navy' : 'text-text-primary'}`}>
-                      {part}
-                    </span>
-                    {isSelected && <Check className="w-4 h-4 text-navy ml-auto" />}
-                  </Button>
-                );
-              })}
-            </div>
-
-            <Button
-              onClick={handleNext}
-              disabled={hardestPart.length === 0}
-              className="w-full bg-coral text-white hover:bg-coral-hover py-4 rounded-[16px] font-semibold shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Continue
-            </Button>
-          </div>
-        );
-
-      // Step 13: Feeling When Speak
-      case 13:
-        const feelings = [
-          'Anxious & start sweating',
-          'Freeze & forget',
-          'I avoid speaking',
-          'I speak but feel embarrassed',
-          'Slightly nervous but okay',
-          'Confident enough'
-        ];
-
-        return (
-          <div className="space-y-6">
-            <MessageBubble
-              autoPlay={true}
-              translation="जब आपको अंग्रेजी में बोलने की ज़रूरत होती है तो आप कैसा महसूस करते हैं?"
-            >
-              How do you feel when you need to speak English?
-            </MessageBubble>
-
-            <div className="space-y-3">
-              {feelings.map(feeling => (
-                <Button
-                  key={feeling}
-                  onClick={() => {
-                    setFeelingWhenSpeak(feeling);
-                    handleNext();
-                  }}
-                  variant="outline"
-                  className="w-full p-4 h-auto border-2 border-gray-200 rounded-[20px] hover:border-teal hover:bg-teal/5 transition-all justify-start text-left font-semibold text-text-primary font-body"
-                >
-                  {feeling}
-                </Button>
-              ))}
-            </div>
-          </div>
-        );
-
-      // Step 14: English Level
-      case 14:
         const levels = [
           { id: 'beginner', name: 'Beginner (A1-A2)', desc: 'I know basic words and simple sentences' },
           { id: 'intermediate', name: 'Intermediate (B1-B2)', desc: 'I can have conversations but struggle sometimes' },
@@ -875,8 +874,8 @@ export default function OnboardingPage() {
           </div>
         );
 
-      // Step 15: Assessment Introduction
-      case 15:
+      // Step 13: Assessment Introduction (was Step 15)
+      case 13:
         return (
           <div className="space-y-6">
             <div className="text-center space-y-3">
@@ -943,8 +942,8 @@ export default function OnboardingPage() {
           </div>
         );
 
-      // Step 16: Assessment Chat (Full-Screen)
-      case 16:
+      // Step 14: Assessment Chat (was Step 16)
+      case 14:
         return (
           <div className="fixed inset-0 bg-bg-primary z-50">
             <AssessmentChat
@@ -974,8 +973,8 @@ export default function OnboardingPage() {
           </div>
         );
 
-      // Step 17: Grading Loader
-      case 17:
+      // Step 15: Grading Loader (was Step 17)
+      case 15:
         return (
           <div className="space-y-6 text-center">
             <div className="text-5xl mb-2">📊</div>
@@ -994,8 +993,8 @@ export default function OnboardingPage() {
           </div>
         );
 
-      // Step 18: Assessment Results (Final Step)
-      case 18:
+      // Step 16: Assessment Results (was Step 18, Final Step)
+      case 16:
         if (!assessmentResult) {
           // Fallback if no results
           return (
@@ -1008,7 +1007,7 @@ export default function OnboardingPage() {
                 Something went wrong with the assessment.
               </p>
               <Button
-                onClick={() => setStep(15)}
+                onClick={() => setStep(13)}
                 className="w-full bg-coral text-white hover:bg-coral-hover py-4 rounded-[16px] font-semibold"
               >
                 Retry Assessment
@@ -1027,7 +1026,7 @@ export default function OnboardingPage() {
                   handleComplete();
                 } else if (destination === 'retake') {
                   setAssessmentResult(null);
-                  setStep(15);
+                  setStep(13);
                 }
               }}
               onBack={handleComplete}
