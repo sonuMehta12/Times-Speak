@@ -121,6 +121,26 @@ export default function AssessmentChat({ userProfile, onComplete, onCancel }: As
     initializeAssessment();
   }, [userName]);
 
+  // Handle recording start - stop any playing TTS
+  const handleRecordingStart = () => {
+    // Stop Gemini TTS audio
+    stopAudio();
+
+    // Stop local audio source
+    if (activeSourceRef.current) {
+      try {
+        activeSourceRef.current.stop();
+        activeSourceRef.current.disconnect();
+      } catch (e) {
+        // Already stopped
+      }
+      activeSourceRef.current = null;
+    }
+
+    // Update playing state
+    isPlayingAudioRef.current = false;
+  };
+
   // Handle sending a message
   const handleSendMessage = async (messageText: string) => {
     if (!messageText.trim()) return;
@@ -354,6 +374,7 @@ export default function AssessmentChat({ userProfile, onComplete, onCancel }: As
               <VoiceRecorder
                 mode="manual"
                 onRecordingComplete={handleSendMessage}
+                onRecordingStart={handleRecordingStart}
                 variant="large"
                 showInterimResults={true}
                 disabled={isLoading}

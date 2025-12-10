@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Check, Play, Loader2, MessageCircle } from 'lucide-react';
 import MessageBubble from '@/components/common/MessageBubble';
-import { saveUserProfile, updateUserProfile } from '@/lib/data/user-profile';
+import { saveUserProfile, updateUserProfile, INITIAL_USER_PROFILE } from '@/lib/data/user-profile';
 import { UserProfile, ConversationAnalysis, Message } from '@/lib/types/roleplay';
 import AssessmentChat from '@/components/assessment/AssessmentChat';
 import ResultsBreakdownPage from '@/components/roleplay/ResultsBreakdownPage';
@@ -43,11 +43,28 @@ export default function OnboardingPage() {
   const totalSteps = 18; // Updated to include assessment flow steps
   const progress = (step / totalSteps) * 100;
 
+  // Cleanup audio whenever step changes
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [step]);
+
   const handleNext = () => {
+    // Stop any playing TTS before changing steps
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     setStep(prev => prev + 1);
   };
 
   const handleBack = () => {
+    // Stop any playing TTS before changing steps
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     setStep(prev => Math.max(prev - 1, 1));
   };
 
@@ -124,6 +141,27 @@ export default function OnboardingPage() {
 
     // Navigate to home page
     router.push('/');
+  };
+
+  // Handle skip to home (bypasses onboarding with default profile)
+  const handleSkipToHome = () => {
+    // Save default profile to localStorage
+    saveUserProfile(INITIAL_USER_PROFILE);
+    // Mark onboarding as complete
+    localStorage.setItem('onboardingCompleted', 'true');
+    // Save basic user data
+    localStorage.setItem('userData', JSON.stringify({
+      userName: INITIAL_USER_PROFILE.name || 'User',
+      onboardingCompleted: true
+    }));
+    // Navigate to home
+    router.push('/');
+  };
+
+  // Handle skip assessment (for demo purposes)
+  const handleSkipAssessment = async () => {
+    // Skip directly to completion without assessment
+    await handleComplete();
   };
 
   // Handle assessment completion
@@ -264,10 +302,10 @@ export default function OnboardingPage() {
 
               <Button
                 variant="ghost"
-                onClick={() => router.push('/')}
+                onClick={handleSkipToHome}
                 className="w-full text-text-secondary hover:text-navy rounded-[16px] font-semibold"
               >
-                Visit Home Page
+                Skip to Home
               </Button>
             </div>
           </div>
@@ -882,12 +920,22 @@ export default function OnboardingPage() {
               </CardContent>
             </Card>
 
-            <Button
-              onClick={handleNext}
-              className="w-full bg-teal text-white hover:bg-teal-hover py-4 rounded-[16px] font-semibold shadow-md"
-            >
-              Start Assessment
-            </Button>
+            <div className="space-y-3">
+              <Button
+                onClick={handleNext}
+                className="w-full bg-teal text-white hover:bg-teal-hover py-4 rounded-[16px] font-semibold shadow-md"
+              >
+                Start Assessment
+              </Button>
+
+              <Button
+                onClick={handleSkipAssessment}
+                variant="ghost"
+                className="w-full text-sm text-text-secondary hover:text-navy hover:bg-gray-100 py-3 rounded-[16px] font-semibold transition-colors"
+              >
+                Skip Assessment (Demo Mode)
+              </Button>
+            </div>
 
             <p className="text-xs text-center text-text-secondary font-body">
               Don't worry, this is just to help us personalize your learning!

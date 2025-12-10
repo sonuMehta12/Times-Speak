@@ -61,20 +61,30 @@ export default function VoiceRecorder({
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const accumulatedTranscriptRef = useRef('');
+  const forceStopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check browser support on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    const checkSupport = () => {
+      if (typeof window === 'undefined') return;
+
       const SpeechRecognition =
         (window as any).SpeechRecognition ||
         (window as any).webkitSpeechRecognition;
 
-      if (!SpeechRecognition) {
+      if (SpeechRecognition) {
+        setIsSupported(true);
+      } else {
         setIsSupported(false);
-        console.warn('Speech recognition not supported in this browser');
+        console.warn('Web Speech Recognition not supported in this browser');
+        if (onError) {
+          onError('Speech recognition not supported. Please use Chrome or Edge browser.');
+        }
       }
-    }
-  }, []);
+    };
+
+    checkSupport();
+  }, [onError]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -203,6 +213,12 @@ export default function VoiceRecorder({
     };
 
     recognition.onend = () => {
+      // Clear forced stop timeout if it exists
+      if (forceStopTimeoutRef.current) {
+        clearTimeout(forceStopTimeoutRef.current);
+        forceStopTimeoutRef.current = null;
+      }
+
       setIsRecording(false);
       stopTimer();
 
@@ -230,12 +246,27 @@ export default function VoiceRecorder({
 
   // Stop recording
   const stopRecording = () => {
-    if (recognitionRef.current) {
+    if (recognitionRef.current && isRecording) {
       try {
         recognitionRef.current.stop();
       } catch (e) {
         // Already stopped
       }
+
+      // Force stop after 500ms if onend doesn't fire
+      forceStopTimeoutRef.current = setTimeout(() => {
+        if (isRecording) {
+          setIsRecording(false);
+          stopTimer();
+          setInterimTranscript('');
+          const finalTranscript = accumulatedTranscriptRef.current.trim();
+          if (finalTranscript && onRecordingComplete) {
+            onRecordingComplete(finalTranscript);
+          }
+          accumulatedTranscriptRef.current = '';
+          setTranscript('');
+        }
+      }, 500);
     }
   };
 
@@ -336,6 +367,25 @@ export default function VoiceRecorder({
         <div className="flex items-center gap-2 mt-1 animate-fade-in">
           <div className="w-2 h-2 bg-error rounded-full animate-pulse" />
           <span className="text-xs text-error font-medium">Recording...</span>
+        </div>
+      )}
+
+      {/* Show transcript while recording or after */}
+      {(transcript || interimTranscript) && (
+        <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200 max-w-md">
+          {transcript && (
+            <p className="text-sm text-navy font-medium">{transcript}</p>
+          )}
+          {interimTranscript && (
+            <p className="text-sm text-gray-400 italic mt-1">{interimTranscript}</p>
+          )}
+        </div>
+      )}
+
+      {/* Unsupported browser message */}
+      {!isSupported && (
+        <div className="text-xs text-red-500 mt-2 text-center max-w-xs">
+          Voice input not supported in this browser. Please use Chrome or Edge.
         </div>
       )}
     </div>
